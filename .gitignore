@@ -38,6 +38,6 @@ build/
 coverage/
 
 # crawlpolicy output (written to the working folder by the script)
-crawlpolicy-report.json
+crawlpolicy-report*.json
 robots.fixed.txt
 .coverage

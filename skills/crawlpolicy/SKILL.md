@@ -36,7 +36,8 @@ python3 <skill-dir>/scripts/crawlpolicy.py diff robots.old.txt robots.txt --lang
 - Intent: clauses `<who>[:<path>]=allow|deny` joined by `;`. `<who>` is `training`, `search`, `user`, `control`,
   `ai` (all AI bots) or `all`, or one bot token such as `GPTBot`. `<path>` is a robots pattern (`/admin/`, `/*.pdf$`),
   default `/`. A later clause overrides an earlier one; cells no clause covers are not checked.
-- Run it once and answer from that run. Never edit the user's robots.txt: the fix is the copy `robots.fixed.txt`.
+- Run it once and answer from that run. That run already re-checked the fixed copy, so do not run `check` or `diff`
+  on `robots.fixed.txt` afterwards. Never edit the user's robots.txt: the fix is the copy `robots.fixed.txt`.
 
 ## Reading the output
 

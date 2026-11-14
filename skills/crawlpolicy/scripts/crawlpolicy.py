@@ -19,11 +19,13 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 MAX_BYTES = 500 * 1024  # RFC 9309 section 2.5: a crawler parses at least the first 500 KiB
 MAX_AUTO_URLS = 40
 MAX_PATCH_LINES = 40  # longer patches are cut on screen; the whole fixed copy is in the fixed file
 CANDIDATES = ("robots.txt", "public/robots.txt", "static/robots.txt", "app/robots.txt")
+DEFAULT_REPORT = "crawlpolicy-report.json"
+FIXED_REPORT = "crawlpolicy-report.fixed.json"  # a later run on the unchanged fixed copy goes here (see pick_report_path)
 ROLES = ("training", "search", "user", "control", "ai", "all")
 TABLE_ROLES = ("training", "search", "user", "control", "other")
 UA_TOKEN = re.compile(r"[A-Za-z_-]+")
@@ -96,7 +98,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "help_bots_file": "JSON file that replaces the built-in crawler table",
         "help_url": "URL or /path to judge (repeatable); default: sample URLs taken from the rules",
         "help_urls": "text file with one URL or /path per line (# comments allowed)",
-        "help_out": "where to write the JSON report (default: crawlpolicy-report.json)",
+        "help_out": ("where to write the JSON report (default: crawlpolicy-report.json; a run on the unchanged fixed "
+                     "copy it names goes to crawlpolicy-report.fixed.json)"),
         "help_fixed_out": "where to write the fixed copy when a fix is needed (default: robots.fixed.txt)",
         "help_lang": "output language en|ko (default: CRAWLPOLICY_LANG, then LC_ALL/LC_MESSAGES/LANG)",
         "col_bot": "bot",
@@ -110,7 +113,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reverified": "re-verified: {v} violations, {c} changed cells",
         "not_verified": "The fix could not be fully verified — review the patch by hand before using it.",
         "wrote_report": "report: {path}",
-        "wrote_fixed": "fixed copy: {path}",
+        "wrote_fixed": "fixed copy: {path} (already re-checked by this run — answer from this output, no second run)",
+        "kept_report": ("note: {path} is the fixed copy that {kept} already re-verified, so {kept} (the verdicts for "
+                        "{src}) is kept and this run is written to {out}"),
         "notes_head": "Provider notes:",
         "note_user_requested": "requests made on a user's behalf; the provider says robots.txt may not apply to them",
         "note_control_token": "control token: does not crawl itself, it only controls how crawled content may be used",
@@ -171,7 +176,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "help_bots_file": "내장 크롤러 표를 통째로 바꾸는 JSON 파일",
         "help_url": "판정할 URL 또는 /경로 (여러 번 가능). 기본: 규칙에서 뽑은 표본 URL",
         "help_urls": "한 줄에 URL 또는 /경로 하나인 텍스트 파일 (# 주석 가능)",
-        "help_out": "JSON 보고서 경로 (기본: crawlpolicy-report.json)",
+        "help_out": ("JSON 보고서 경로 (기본: crawlpolicy-report.json, 그 보고서의 수정본을 그대로 다시 검사하면 "
+                     "crawlpolicy-report.fixed.json)"),
         "help_fixed_out": "수정이 필요할 때 수정본을 쓸 경로 (기본: robots.fixed.txt)",
         "help_lang": "출력 언어 en|ko (기본: CRAWLPOLICY_LANG, 그다음 LC_ALL/LC_MESSAGES/LANG)",
         "col_bot": "봇",
@@ -185,7 +191,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reverified": "재검증: 위반 {v}, 바뀐 정상 칸 {c}",
         "not_verified": "수정안을 끝까지 검증하지 못했습니다 — 쓰기 전에 패치를 직접 확인하세요.",
         "wrote_report": "보고서: {path}",
-        "wrote_fixed": "수정본: {path}",
+        "wrote_fixed": "수정본: {path} (이번 실행에서 이미 재검증함 — 다시 돌리지 말고 이 출력으로 답하세요)",
+        "kept_report": ("참고: {path} 는 이미 {kept} 에서 재검증한 수정본입니다. {src} 의 판정이 담긴 {kept} 는 "
+                        "그대로 두고 이번 결과는 {out} 에 씁니다"),
         "notes_head": "제공자 메모:",
         "note_user_requested": "사용자 요청으로 가져오는 봇이며, 제공자가 robots.txt 가 적용되지 않을 수 있다고 밝힘",
         "note_control_token": "제어 토큰: 직접 크롤링하지 않고 수집된 내용의 사용 방식만 정함",
@@ -753,9 +761,37 @@ def file_info(src: dict) -> dict:
 
 def write_text(path: str, content: str) -> None:
     try:
-        Path(path).write_text(content, encoding="utf-8")
+        # newline="" 로 바이트를 그대로 쓴다 — 보고서에 적은 수정본 sha256 이 어느 OS 에서도 파일과 같아야 한다
+        Path(path).write_text(content, encoding="utf-8", newline="")
     except OSError as e:
         raise CliError(2, "err_write", path=path, why=e.strerror or str(e)) from e
+
+
+def pick_report_path(out: str | None, inputs: list[dict]) -> tuple[str, dict | None]:
+    """Return (report path to write, None or {"path": fixed copy, "kept": kept report, "src": its source file}).
+
+    A check that proposed a fix leaves the evidence for the user's file in the default report. Running check or diff
+    on that unchanged fixed copy afterwards (a natural "double check") must not replace it, so that run goes to a
+    side file instead. An explicit --out is always honoured.
+    """
+    if out is not None:
+        return out, None
+    prev_path = Path(DEFAULT_REPORT)
+    try:
+        prev = json.loads(prev_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return DEFAULT_REPORT, None  # 이전 보고서가 없거나 읽을 수 없으면 평소처럼 기본 경로에 쓴다
+    fix = prev.get("fix") if isinstance(prev, dict) and prev.get("mode") == "check" else None
+    if not (isinstance(fix, dict) and fix.get("needed") and isinstance(fix.get("path"), str)
+            and isinstance(fix.get("sha256"), str)):
+        return DEFAULT_REPORT, None
+    fixed_file = (prev_path.resolve().parent / fix["path"]).resolve()  # 보고서 폴더 기준 상대 경로
+    for src in inputs:
+        # 같은 파일이고 내용도 그대로일 때만 "수정본 재확인"으로 본다 — 사용자가 고쳤다면 새 판정이 맞다
+        if Path(src["path"]).resolve() == fixed_file and src["sha256"] == fix["sha256"]:
+            source = prev.get("source") if isinstance(prev.get("source"), dict) else {}
+            return FIXED_REPORT, {"path": src["path"], "kept": DEFAULT_REPORT, "src": source.get("path") or "?"}
+    return DEFAULT_REPORT, None
 
 
 def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
@@ -808,9 +844,10 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         if clauses else None,
         "fix": fix_report, "changed": [], "exit_code": exit_code,
     }
+    out_path, kept = pick_report_path(args.out, [src])  # 수정본을 다시 검사해도 원본 보고서는 지킨다
     if fix:
         write_text(fixed_path, fix["text"])
-    write_text(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
 
     for w in src["warnings"]:
         if w == "truncated":
@@ -853,7 +890,9 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         for n in notes:
             who = ", ".join(b["token"] for b in bots if b["note"] == n)
             out_lines.append(f"  {who}: " + t("note_" + n))
-    out_lines.append(t("wrote_report", path=args.out))
+    if kept:
+        out_lines.append(t("kept_report", out=out_path, **kept))
+    out_lines.append(t("wrote_report", path=out_path))
     return exit_code
 
 
@@ -886,7 +925,8 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
                     "denied": sum(1 for c in c_new if not c["allowed"]), "violations": 0},
         "intent": None, "fix": None, "changed": changed, "exit_code": exit_code,
     }
-    write_text(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    out_path, kept = pick_report_path(args.out, [old, new])  # 원본과 수정본의 diff 도 원본 보고서를 덮지 않는다
+    write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
     for src, name in ((old, args.old), (new, args.new)):
         for _ in src["warnings"]:
             err_lines.append(t("warn_truncated", path=name))
@@ -899,7 +939,9 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
             def short(v: dict) -> str:
                 return ("allow" if v["allowed"] else "deny") + f" @L{v['rule_line'] or 0}"
             out_lines.append(t("diff_line", bot=ch["bot"], url=ch["url"], before=short(ch["before"]), after=short(ch["after"])))
-    out_lines.append(t("wrote_report", path=args.out))
+    if kept:
+        out_lines.append(t("kept_report", out=out_path, **kept))
+    out_lines.append(t("wrote_report", path=out_path))
     return exit_code
 
 
@@ -945,7 +987,7 @@ def build_parser(t) -> argparse.ArgumentParser:
         p.add_argument("--bots-file", metavar="FILE", help=t("help_bots_file"))
         p.add_argument("--url", action="append", metavar="U", help=t("help_url"))
         p.add_argument("--urls", metavar="FILE", help=t("help_urls"))
-        p.add_argument("--out", default="crawlpolicy-report.json", metavar="FILE", help=t("help_out"))
+        p.add_argument("--out", default=None, metavar="FILE", help=t("help_out"))  # None = DEFAULT_REPORT (see pick_report_path)
         p.add_argument("--lang", choices=sorted(MESSAGES), default=argparse.SUPPRESS, help=t("help_lang"))
 
     parser = Parser(prog="crawlpolicy.py", description=t("help_description"))
