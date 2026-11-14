@@ -1,0 +1,7 @@
+# URLs a RAG collector wants to fetch
+/
+/blog/public/faq
+/admin/users
+/café/menu
+/docs/guide.pdf
+/docs/guide.html

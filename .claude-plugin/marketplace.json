@@ -1,0 +1,12 @@
+{
+  "name": "crawlpolicy-skill",
+  "owner": {"name": "LeeGyeongPil"},
+  "description": "Agent skill that checks a saved robots.txt per AI crawler and URL against the site's intended crawling policy.",
+  "plugins": [
+    {
+      "name": "crawlpolicy",
+      "source": "./",
+      "description": "RFC 9309 bot-by-URL verdict matrix with the winning rule line, intent check, verified minimal fix and old/new diff for robots.txt."
+    }
+  ]
+}

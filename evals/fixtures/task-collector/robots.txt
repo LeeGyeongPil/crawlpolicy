@@ -1,0 +1,5 @@
+# A documentation site that wants its guides read
+User-agent: *
+Disallow: /admin/
+Disallow: /caf%C3%A9/
+Disallow: /*.pdf$

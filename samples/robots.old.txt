@@ -1,0 +1,12 @@
+# Previous version of the site policy.
+User-agent: *
+Disallow: /admin/
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /admin/users

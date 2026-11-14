@@ -1,0 +1,14 @@
+# Example site policy: keep AI training crawlers out, keep search crawlers in.
+User-agent: *
+Disallow: /admin/
+
+User-agent: GPTBot
+User-agent: CCBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /blog/
+Allow: /blog/public/
+
+User-agent: OAI-SearchBot
+Disallow: /admin/users

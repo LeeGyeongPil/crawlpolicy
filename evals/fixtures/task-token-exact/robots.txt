@@ -1,0 +1,5 @@
+User-agent: Applebot
+Disallow: /private/
+
+User-agent: *
+Disallow: /

@@ -1,0 +1,9 @@
+{
+  "name": "crawlpolicy",
+  "version": "0.1.0",
+  "description": "Judges a saved robots.txt by RFC 9309 for every AI and search crawler and URL, compares it with a one-line intent, proposes a re-verified minimal fix and diffs two versions.",
+  "author": {"name": "LeeGyeongPil"},
+  "license": "MIT",
+  "homepage": "https://github.com/LeeGyeongPil/crawlpolicy",
+  "repository": "https://github.com/LeeGyeongPil/crawlpolicy"
+}
