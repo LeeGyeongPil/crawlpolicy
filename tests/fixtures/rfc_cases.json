@@ -1,0 +1,194 @@
+[
+ {
+  "id": "C01-longest-match",
+  "robots": "User-agent: *\nDisallow: /shop\nAllow: /shop/public\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/shop/public/a.html",
+  "allowed": true,
+  "rule_line": 3
+ },
+ {
+  "id": "C02-tie-allow-wins",
+  "robots": "User-agent: *\nDisallow: /page\nAllow: /page\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/page",
+  "allowed": true,
+  "rule_line": 3
+ },
+ {
+  "id": "C03-wildcard-dollar-pdf",
+  "robots": "User-agent: *\nDisallow: /*.pdf$\n",
+  "agent": "ClaudeBot",
+  "url": "https://example.com/docs/a.pdf",
+  "allowed": false,
+  "rule_line": 2
+ },
+ {
+  "id": "C04-dollar-not-matching-query",
+  "robots": "User-agent: *\nDisallow: /*.pdf$\n",
+  "agent": "ClaudeBot",
+  "url": "https://example.com/docs/a.pdf?x=1",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C05-dollar-exact",
+  "robots": "User-agent: *\nDisallow: /private$\n",
+  "agent": "CCBot",
+  "url": "https://example.com/private/x",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C06-group-merge",
+  "robots": "User-agent: GPTBot\nDisallow: /a\n\nUser-agent: Bingbot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /b\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/b/1",
+  "allowed": false,
+  "rule_line": 8
+ },
+ {
+  "id": "C07-specific-group-no-star-merge",
+  "robots": "User-agent: *\nDisallow: /\n\nUser-agent: GPTBot\nAllow: /\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/x",
+  "allowed": true,
+  "rule_line": 5
+ },
+ {
+  "id": "C08-multi-ua-one-group",
+  "robots": "User-agent: GPTBot\nUser-agent: ClaudeBot\nDisallow: /\n",
+  "agent": "ClaudeBot",
+  "url": "https://example.com/x",
+  "allowed": false,
+  "rule_line": 3
+ },
+ {
+  "id": "C09-ua-case-insensitive",
+  "robots": "user-agent: gptbot\ndisallow: /\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/x",
+  "allowed": false,
+  "rule_line": 2
+ },
+ {
+  "id": "C10-blank-line-inside-group",
+  "robots": "User-agent: CCBot\n\nDisallow: /\n",
+  "agent": "CCBot",
+  "url": "https://example.com/x",
+  "allowed": false,
+  "rule_line": 3
+ },
+ {
+  "id": "C11-prefix-token-not-same-bot",
+  "robots": "User-agent: Google\nDisallow: /\n",
+  "agent": "Google-Extended",
+  "url": "https://example.com/x",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C12-star-first-group-order",
+  "robots": "User-agent: *\nDisallow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n",
+  "agent": "OAI-SearchBot",
+  "url": "https://example.com/news/1",
+  "allowed": true,
+  "rule_line": 5
+ },
+ {
+  "id": "C13-allow-root-dollar",
+  "robots": "User-agent: *\nAllow: /$\nDisallow: /\n",
+  "agent": "PerplexityBot",
+  "url": "https://example.com/",
+  "allowed": true,
+  "rule_line": 2
+ },
+ {
+  "id": "C14-allow-root-dollar-other",
+  "robots": "User-agent: *\nAllow: /$\nDisallow: /\n",
+  "agent": "PerplexityBot",
+  "url": "https://example.com/about",
+  "allowed": false,
+  "rule_line": 3
+ },
+ {
+  "id": "C15-empty-disallow",
+  "robots": "User-agent: *\nDisallow:\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/x",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C16-percent-encoding",
+  "robots": "User-agent: *\nDisallow: /caf%C3%A9\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/café/menu",
+  "allowed": false,
+  "rule_line": 2
+ },
+ {
+  "id": "C17-wildcard-middle-query",
+  "robots": "User-agent: *\nDisallow: /*?sessionid=\n",
+  "agent": "Applebot-Extended",
+  "url": "https://example.com/p?a=1&sessionid=9",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C18-wildcard-middle-query-hit",
+  "robots": "User-agent: *\nDisallow: /*?sessionid=\n",
+  "agent": "Applebot-Extended",
+  "url": "https://example.com/p?sessionid=9",
+  "allowed": false,
+  "rule_line": 2
+ },
+ {
+  "id": "C19-longest-wildcard-vs-plain",
+  "robots": "User-agent: *\nAllow: /blog/*.html\nDisallow: /blog/\n",
+  "agent": "ClaudeBot",
+  "url": "https://example.com/blog/post.html",
+  "allowed": true,
+  "rule_line": 2
+ },
+ {
+  "id": "C20-ua-with-version-string",
+  "robots": "User-agent: ClaudeBot\nDisallow: /\n",
+  "agent": "ClaudeBot/1.0",
+  "url": "https://example.com/x",
+  "allowed": false,
+  "rule_line": 2
+ },
+ {
+  "id": "C21-applebot-vs-extended",
+  "robots": "User-agent: Applebot\nDisallow: /\n",
+  "agent": "Applebot-Extended",
+  "url": "https://example.com/x",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C22-rules-before-any-ua",
+  "robots": "Disallow: /\nUser-agent: GPTBot\nAllow: /x\n",
+  "agent": "Bytespider",
+  "url": "https://example.com/y",
+  "allowed": true,
+  "rule_line": 0
+ },
+ {
+  "id": "C23-encoded-url-input",
+  "robots": "User-agent: *\nDisallow: /caf%C3%A9\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/caf%C3%A9/menu",
+  "allowed": false,
+  "rule_line": 2
+ },
+ {
+  "id": "C24-lowercase-escape-in-rule",
+  "robots": "User-agent: *\nDisallow: /a%3c\n",
+  "agent": "GPTBot",
+  "url": "https://example.com/a%3Cb",
+  "allowed": false,
+  "rule_line": 2
+ }
+]
