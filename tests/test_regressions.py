@@ -1,12 +1,16 @@
 """Regression tests for the review findings: large input speed, usage errors in both languages, help text, HTML check."""
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import time
+from pathlib import Path
 
 import pytest
 
 import crawlpolicy as cp
+from conftest import DEMO_INTENT
 
 
 def test_large_robots_txt_finishes_in_seconds(cli, tmp_path):
@@ -83,3 +87,71 @@ def test_comment_mentioning_html_is_not_html(cli, tmp_path):
     assert res.code == 2 and "looks like HTML" in res.err
     (tmp_path / "page2.txt").write_text("<?php ?>\n<p>hi</p><html lang=en>\n", encoding="utf-8")
     assert cli("check", str(tmp_path / "page2.txt"), "--out", str(tmp_path / "r.json")).code == 2
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# soak regression (task-inherit-gap): a second run on the fixed copy replaced the report for the user's file.
+# ---------------------------------------------------------------------------------------------------------------
+def _first_fix_run(cli, report):
+    res = cli("check", "robots.txt", "--intent", DEMO_INTENT)
+    assert res.code == 1
+    assert "already re-checked by this run" in res.out       # the fix run itself says no second run is needed
+    return report(Path("."))
+
+
+def test_recheck_of_fixed_copy_keeps_the_original_report(cli, work, report):
+    before = _first_fix_run(cli, report)
+    again = cli("check", "robots.fixed.txt", "--intent", DEMO_INTENT)
+    assert again.code == 0 and "Intent holds" in again.out
+    assert "robots.fixed.txt is the fixed copy that crawlpolicy-report.json already re-verified" in again.out
+    assert again.out.rstrip().endswith("report: crawlpolicy-report.fixed.json")
+    assert report(work) == before                              # the evidence for robots.txt is untouched
+    side = json.loads((work / "crawlpolicy-report.fixed.json").read_text(encoding="utf-8"))
+    assert side["source"]["path"] == "robots.fixed.txt" and side["source"]["sha256"] == before["fix"]["sha256"]
+
+
+def test_diff_against_fixed_copy_keeps_the_original_report(cli, work, report):
+    before = _first_fix_run(cli, report)
+    res = cli("--lang", "ko", "diff", "robots.txt", "robots.fixed.txt")
+    assert res.code == 1
+    assert "참고: robots.fixed.txt 는 이미 crawlpolicy-report.json 에서 재검증한 수정본입니다" in res.out
+    assert report(work) == before
+    assert json.loads((work / "crawlpolicy-report.fixed.json").read_text(encoding="utf-8"))["mode"] == "diff"
+
+
+def test_explicit_out_is_always_honoured(cli, work, report):
+    _first_fix_run(cli, report)
+    res = cli("check", "robots.fixed.txt", "--intent", DEMO_INTENT, "--out", "crawlpolicy-report.json")
+    assert "is kept" not in res.out
+    assert report(work)["source"]["path"] == "robots.fixed.txt"
+    assert not (work / "crawlpolicy-report.fixed.json").exists()
+
+
+def test_edited_fixed_copy_gets_a_fresh_default_report(cli, work, report):
+    """Once the user changes the fixed copy it is their new file, so the usual default report applies."""
+    _first_fix_run(cli, report)
+    fixed = work / "robots.fixed.txt"
+    fixed.write_text(fixed.read_text(encoding="utf-8") + "\nUser-agent: ExtraBot\nDisallow: /x/\n", encoding="utf-8")
+    res = cli("check", "robots.fixed.txt", "--intent", DEMO_INTENT)
+    assert "is kept" not in res.out
+    assert report(work)["source"]["path"] == "robots.fixed.txt"
+
+
+@pytest.mark.parametrize("old", ["{not json", "[]", '{"mode": "diff", "fix": null}', '{"mode": "check", "fix": 3}'])
+def test_unreadable_previous_report_is_simply_replaced(cli, work, report, old):
+    (work / "crawlpolicy-report.json").write_text(old, encoding="utf-8")
+    res = cli("check", "robots.txt", "--intent", DEMO_INTENT)
+    assert res.code == 1 and "is kept" not in res.out
+    assert report(work)["source"]["path"] == "robots.txt"
+
+
+def test_fixed_copy_bytes_match_the_reported_sha256(cli, work, report):
+    rep = _first_fix_run(cli, report)
+    assert hashlib.sha256((work / "robots.fixed.txt").read_bytes()).hexdigest() == rep["fix"]["sha256"]
+
+
+def test_kept_report_message_exists_in_both_languages():
+    for lang in cp.MESSAGES:
+        msg = cp.MESSAGES[lang]["kept_report"]
+        for field in ("{path}", "{kept}", "{src}", "{out}"):
+            assert field in msg, (lang, field)

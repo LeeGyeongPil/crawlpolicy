@@ -105,6 +105,28 @@ def test_every_report_grader_matches_the_real_script_output(tmp_path, name, args
     assert sha in report
 
 
+@pytest.mark.parametrize("follow_up", [
+    ["check", "robots.fixed.txt", "--intent", "training=deny; control=deny; search=allow; user=allow; all:/admin/=deny"],
+    ["check", "robots.fixed.txt", "--bots", "Google-Extended", "--url", "/admin/users"],
+    ["diff", "robots.txt", "robots.fixed.txt"],
+])
+def test_inherit_gap_graders_survive_a_second_run_on_the_fixed_copy(tmp_path, follow_up):
+    """soak regression: a model re-checked robots.fixed.txt after the fix run and the report for robots.txt was
+    replaced, so gap-verdict and source-sha256 failed. The report for the user's file must survive that run."""
+    work = tmp_path / "task-inherit-gap"
+    shutil.copytree(EVALS / "fixtures" / "task-inherit-gap", work)
+    first = _run(work, "check", "--intent", "training=deny; control=deny; search=allow; user=allow; all:/admin/=deny")
+    assert first.returncode == 1
+    second = _run(work, *follow_up)
+    assert "crawlpolicy-report.fixed.json" in second.stdout and "is kept" in second.stdout
+    report = (work / "crawlpolicy-report.json").read_text(encoding="utf-8")
+    for g in (EVALS / "task-inherit-gap" / "graders").glob("*.md"):
+        if g.stem == "script-ran" or g.stem.startswith("answer-"):
+            continue
+        assert re.search(_front(g)[0]["pattern"], report), g.stem
+    assert (work / "crawlpolicy-report.fixed.json").is_file()
+
+
 @pytest.mark.parametrize("name,code,expect", [
     ("task-error-html", 2, r"not a robots\.txt file: \S*robots\.txt \(looks like HTML\)"),
     ("task-error-ambiguous", 3, r"found 2 robots\.txt files: \./robots\.txt, public/robots\.txt"),
