@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-11-14
+
+### Fixed
+
+- Running `check` or `diff` on the unchanged fixed copy after a fix run (a natural double check) no longer replaces
+  the report for the original file: that run is written to `crawlpolicy-report.fixed.json` and a note says so. An
+  explicit `--out` is always used as given, and a fixed copy the user has edited gets the usual default report.
+- The fix run says the fixed copy was already re-checked, and the skill instructions say not to run the script on
+  `robots.fixed.txt` again.
+- The fixed copy is written byte for byte (no newline translation), so its bytes always match `fix.sha256`.
+- README: the measurement table uses the 0.1.1 run (mean score gain +0.59) and the test count is 122.
+
+### Known issues
+
+- The note that a report was written to `crawlpolicy-report.fixed.json` is printed in the terminal but is not stored
+  in the JSON report.
+- Still open from 0.1.0: the contradictory verification lines for fixed copies over 500 KiB, the Applebot fallback
+  note shown even when the file has an `Applebot` group, and the unneeded legend in single-bot line output.
+- The Korean screenshot `docs/images/check-fix.ko.png` shows an English shell comment (`# fix part of the output`)
+  on the command line; it will be replaced when screenshots are next retaken.
+
 ## [0.1.0] - 2026-11-14
 
 ### Fixed

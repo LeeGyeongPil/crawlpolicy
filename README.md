@@ -134,7 +134,7 @@ Checked 2026-11-14. Bingbot is not in the table because its page could not be ve
 ## Output
 
 - Terminal: the matrix, violations, patch, `re-verified: ...`, provider notes. A single bot prints one `<bot> <url> => allow|deny @L<n>` line per URL.
-- `crawlpolicy-report.json` in the working folder: `source.sha256`, cells with `verdict` and `rule_line`, violations, `fix.verified`, `fix.violations_after`, `fix.regressions`. Keys are the same in both languages. Each run overwrites the file.
+- `crawlpolicy-report.json` in the working folder: `source.sha256`, cells with `verdict` and `rule_line`, violations, `fix.verified`, `fix.violations_after`, `fix.regressions`. Keys are the same in both languages. Each run overwrites the file. If you run `check` or `diff` on the unchanged `robots.fixed.txt`, the original report is kept and the result goes to `crawlpolicy-report.fixed.json` with a note; the fix run itself already prints the re-verification, so that second run is not needed.
 - `robots.fixed.txt`: the fixed copy.
 - Exit codes: `0` intent holds or nothing changed; `1` violations found or verdicts changed; `2` input problem (missing file, HTML page, binary file, bad `--intent`); `3` no single robots.txt found (auto-detect looks in `./`, `public/`, `static/`, `app/`).
 
@@ -160,7 +160,7 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | Stays quiet when it should not | 11/11 |
 | Tasks solved with the skill | 7/7 |
 | Tasks solved without it (baseline) | 0/7 |
-| Mean score gain (Δ) | +0.50 |
+| Mean score gain (Δ) | +0.59 |
 | Tasks that catch a broken script | 7/7 |
 | Codex CLI | not verified |
 
@@ -198,7 +198,7 @@ Good fits: checking a robots.txt before deploy when you want AI training crawler
 uv sync && uv run pytest -q
 ```
 
-109 tests pass (`uv run pytest -q`, Python 3.10, 3.12 and 3.14 in the CI matrix). The `evals/` folder holds 12 trigger cases (3 in Korean), 11 no-trigger cases and 7 task cases with fixtures, used by `claude plugin eval`.
+122 tests pass (`uv run pytest -q`, Python 3.10, 3.12 and 3.14 in the CI matrix). The `evals/` folder holds 12 trigger cases (3 in Korean), 11 no-trigger cases and 7 task cases with fixtures, used by `claude plugin eval`.
 
 ## License
 

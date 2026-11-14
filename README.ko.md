@@ -134,7 +134,7 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py diff samples/robots.old.txt sa
 ## 출력
 
 - 터미널: 판정 표, 위반, 패치, `re-verified: ...`(한국어 출력은 `재검증: ...`), 제공자 메모. 봇 하나만 물으면 URL 마다 `<bot> <url> => allow|deny @L<n>` 한 줄입니다.
-- 작업 폴더의 `crawlpolicy-report.json`: `source.sha256`, `verdict`·`rule_line` 이 있는 칸, 위반, `fix.verified`, `fix.violations_after`, `fix.regressions`. 키는 두 언어에서 같고, 실행할 때마다 덮어씁니다.
+- 작업 폴더의 `crawlpolicy-report.json`: `source.sha256`, `verdict`·`rule_line` 이 있는 칸, 위반, `fix.verified`, `fix.violations_after`, `fix.regressions`. 키는 두 언어에서 같고, 실행할 때마다 덮어씁니다. 수정 안 한 `robots.fixed.txt` 에 `check`·`diff` 를 다시 돌리면 원래 report 는 그대로 두고 결과를 안내 문구와 함께 `crawlpolicy-report.fixed.json` 에 씁니다. fix 실행이 이미 재검증 결과를 출력하므로 이 두 번째 실행은 필요 없습니다.
 - `robots.fixed.txt`: 수정본.
 - 종료 코드: `0` 의도 충족 또는 바뀐 것 없음, `1` 위반 발견 또는 판정 변경, `2` 입력 문제(파일 없음·HTML 페이지·바이너리·잘못된 `--intent`), `3` robots.txt 를 하나로 정하지 못함(자동 탐지는 `./`, `public/`, `static/`, `app/` 를 봅니다).
 
@@ -160,7 +160,7 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | 필요 없을 때 안 불림 | 11/11 |
 | 스킬로 푼 작업 | 7/7 |
 | 스킬 없이 푼 작업(기준선) | 0/7 |
-| 평균 점수 차이(Δ) | +0.50 |
+| 평균 점수 차이(Δ) | +0.59 |
 | 가짜 스크립트를 잡아낸 비율 | 7/7 |
 | Codex CLI | 미검증 |
 
@@ -198,7 +198,7 @@ flowchart LR
 uv sync && uv run pytest -q
 ```
 
-테스트 109개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
+테스트 122개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
 
 ## 라이선스
 
