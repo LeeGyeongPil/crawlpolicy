@@ -50,6 +50,25 @@ def test_no_help_or_exploration():
     assert "crawlpolicy-report" not in body
 
 
+def test_body_at_most_60_lines():
+    _, _, body = _split()
+    assert len(body.strip("\n").splitlines()) <= 60
+
+
+def test_run_first_and_paste_lines_rules():
+    """plan v3 section 4: run the script even for a simple-looking file, ask with --bots/--url, paste the lines first."""
+    _, _, body = _split()
+    flat = " ".join(body.split())
+    assert "even when the file looks short and simple, do not judge it by reading it: run the bundled script once" in flat
+    assert "as your first step" in flat
+    assert "--bots" in body and "--url /path` per URL asked" in flat
+    assert ("Start the answer with the verdict lines, violation lines or diff lines pasted exactly as printed, in a "
+            "code block, before any summary.") in flat
+    assert "=> allow|deny @L<n>  (<winning rule>)" in body                    # the shape the agent will see
+    assert "Exit code 2 or 3: show the error line as is and stop" in flat
+    assert "do not run it again on `robots.fixed.txt`" in flat
+
+
 def test_package_has_no_agent_config_or_hooks():
     for name in (".claude", "CLAUDE.md", "AGENTS.md", ".mcp.json", "hooks", "agents", "commands"):
         assert not (REPO / name).exists(), name

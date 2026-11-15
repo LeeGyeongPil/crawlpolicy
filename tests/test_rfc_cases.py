@@ -39,6 +39,29 @@ def test_stdlib_only_imports():
     assert mods <= set(sys.stdlib_module_names), mods - set(sys.stdlib_module_names)
 
 
+EVAL_FIXTURES = Path(__file__).resolve().parent.parent / "evals" / "fixtures"
+DECISIVE = [   # (fixture, bot, url, allowed, rule line) — the points hand reading and first-match parsers get wrong
+    ("task-longest-match", "GPTBot", "/shop/public/a.html", True, 3),          # longest match, not first match
+    ("task-longest-match", "GPTBot", "/shop/sale/x", True, 5),                 # Allow and Disallow tie: Allow wins
+    ("task-longest-match", "GPTBot", "/shop/public/data.json?v=2", True, 3),   # '$' anchors the end
+    ("task-longest-match", "GPTBot", "/shop/public/data.json", False, 4),
+    ("task-token-exact", "Applebot", "/", True, 0),
+    ("task-token-exact", "Applebot", "/private/press/kit.html", True, 8),      # two Applebot groups are merged
+    ("task-token-exact", "Applebot-Extended", "/", False, 5),                  # exact token: falls back to '*'
+    ("task-token-exact", "Applebot-Extended", "/private/press/kit.html", False, 5),
+    ("task-collector", "DocsHarvester", "/crêpes/list", False, 4),             # raw UTF-8 URL vs %C3%AA rule
+    ("task-collector", "DocsHarvester", "/books/cookbook.epub", False, 5),
+    ("task-collector", "DocsHarvester", "/books/cookbook.html", True, 0),
+]
+
+
+@pytest.mark.parametrize("fixture,bot,url,allowed,line", DECISIVE)
+def test_eval_decisive_cells(fixture, bot, url, allowed, line):
+    groups, _ = cp.parse_robots((EVAL_FIXTURES / fixture / "robots.txt").read_text(encoding="utf-8"))
+    got = cp.decide(groups, bot, url)
+    assert (got["allowed"], got["rule_line"] or 0) == (allowed, line)
+
+
 def test_product_token_is_exact_not_substring():
     robots = "User-agent: Applebot\nDisallow: /\n\nUser-agent: Google\nDisallow: /\n"
     groups, _ = cp.parse_robots(robots)

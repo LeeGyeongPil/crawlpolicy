@@ -3,7 +3,9 @@
 
 One run of ``check`` builds the bot x URL verdict matrix (with the winning rule line of every cell), compares it with
 the intent, proposes a minimal fix, re-verifies the fixed copy and writes crawlpolicy-report.json.
-``diff OLD NEW`` lists only the cells whose verdict changed. Standard library only, no network access.
+Small runs print one verdict line per cell with the winning rule text instead of the matrix, so the evidence is on
+stdout even when no report can be kept. ``diff OLD NEW`` lists only the cells whose verdict changed.
+Standard library only, no network access.
 
 Exit codes: 0 ok / nothing changed, 1 intent violated / verdicts changed, 2 input error, 3 robots.txt auto-detect failed.
 """
@@ -11,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import errno
 import hashlib
 import json
 import os
@@ -19,10 +22,14 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 MAX_BYTES = 500 * 1024  # RFC 9309 section 2.5: a crawler parses at least the first 500 KiB
 MAX_AUTO_URLS = 40
 MAX_PATCH_LINES = 40  # longer patches are cut on screen; the whole fixed copy is in the fixed file
+# Verdict-line mode (one "<bot> <url> => allow @L3  (Allow: /x)" line per cell instead of the matrix): one bot, at most
+# LINE_CELLS cells, or URLs given with --url/--urls and at most LINE_CELLS_GIVEN cells (the built-in 15 bots x 4 URLs).
+LINE_CELLS = 12
+LINE_CELLS_GIVEN = 60
 CANDIDATES = ("robots.txt", "public/robots.txt", "static/robots.txt", "app/robots.txt")
 DEFAULT_REPORT = "crawlpolicy-report.json"
 DEFAULT_FIXED = "robots.fixed.txt"
@@ -100,7 +107,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "help_url": "URL or /path to judge (repeatable); default: sample URLs taken from the rules",
         "help_urls": "text file with one URL or /path per line (# comments allowed)",
         "help_out": ("where to write the JSON report (default: crawlpolicy-report.json; a run on the unchanged fixed "
-                     "copy it names goes to crawlpolicy-report.fixed.json)"),
+                     "copy it names goes to crawlpolicy-report.fixed.json; /dev/null keeps no report)"),
         "help_fixed_out": "where to write the fixed copy when a fix is needed (default: robots.fixed.txt)",
         "help_lang": "output language en|ko (default: CRAWLPOLICY_LANG, then LC_ALL/LC_MESSAGES/LANG)",
         "col_bot": "bot",
@@ -119,6 +126,17 @@ MESSAGES: dict[str, dict[str, str]] = {
         "outputs_replaced": ("files: no input file was changed; this run wrote {files} as its record ({replaced} "
                              "already existed and was replaced) — these are output files, not edits: leave them in "
                              "place"),
+        "outputs_no_report": ("files: no input file was changed; no report was kept (--out {path}) — the lines above "
+                              "are the full result"),
+        "outputs_no_report_fixed": ("files: no input file was changed; no report was kept (--out {path}) and this run "
+                                    "only added the fixed copy {fixed} — the lines above are the full result"),
+        "outputs_no_report_fixed_replaced": ("files: no input file was changed; no report was kept (--out {path}) and "
+                                             "this run wrote the fixed copy {fixed} ({fixed} already existed and was "
+                                             "replaced) — the lines above are the full result"),
+        "outputs_nothing": "files: no input file was changed and nothing was written — the lines above are the full result",
+        "warn_not_written": ("warning: cannot write {path} here ({why}) — nothing was written; the verdicts above are "
+                             "complete"),
+        "rule_none": "no matching rule",
         "wrote_fixed": "fixed copy: {path} (already re-checked by this run — answer from this output, no second run)",
         "kept_report": ("note: {path} is the fixed copy that {kept} already re-verified, so {kept} (the verdicts for "
                         "{src}) is kept and this run is written to {out}"),
@@ -192,7 +210,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "help_url": "판정할 URL 또는 /경로 (여러 번 가능). 기본: 규칙에서 뽑은 표본 URL",
         "help_urls": "한 줄에 URL 또는 /경로 하나인 텍스트 파일 (# 주석 가능)",
         "help_out": ("JSON 보고서 경로 (기본: crawlpolicy-report.json, 그 보고서의 수정본을 그대로 다시 검사하면 "
-                     "crawlpolicy-report.fixed.json)"),
+                     "crawlpolicy-report.fixed.json, /dev/null 이면 보고서를 남기지 않음)"),
         "help_fixed_out": "수정이 필요할 때 수정본을 쓸 경로 (기본: robots.fixed.txt)",
         "help_lang": "출력 언어 en|ko (기본: CRAWLPOLICY_LANG, 그다음 LC_ALL/LC_MESSAGES/LANG)",
         "col_bot": "봇",
@@ -210,6 +228,15 @@ MESSAGES: dict[str, dict[str, str]] = {
                          "새 출력 파일이니 그대로 두세요"),
         "outputs_replaced": ("파일: 입력 파일은 하나도 바꾸지 않았고, 이번 실행의 기록으로 {files} 를 썼습니다 (이미 있던 "
                              "{replaced} 는 새 내용으로 바꿈) — 편집이 아니라 출력 파일이니 그대로 두세요"),
+        "outputs_no_report": "파일: 입력 파일은 하나도 바꾸지 않았고 보고서는 남기지 않았습니다 (--out {path}) — 위 줄이 결과 전부입니다",
+        "outputs_no_report_fixed": ("파일: 입력 파일은 하나도 바꾸지 않았고 보고서는 남기지 않았으며 (--out {path}) 수정본 {fixed} "
+                                    "만 새로 썼습니다 — 위 줄이 결과 전부입니다"),
+        "outputs_no_report_fixed_replaced": ("파일: 입력 파일은 하나도 바꾸지 않았고 보고서는 남기지 않았으며 (--out {path}) "
+                                             "수정본 {fixed} 를 썼습니다 (이미 있던 {fixed} 는 새 내용으로 바꿈) — 위 줄이 결과 "
+                                             "전부입니다"),
+        "outputs_nothing": "파일: 입력 파일은 하나도 바꾸지 않았고 아무 파일도 쓰지 않았습니다 — 위 줄이 결과 전부입니다",
+        "warn_not_written": "경고: 여기에 {path} 를 쓸 수 없습니다 ({why}) — 아무것도 쓰지 않았고, 위 판정은 그대로 완전합니다",
+        "rule_none": "해당 규칙 없음",
         "wrote_fixed": "수정본: {path} (이번 실행에서 이미 재검증함 — 다시 돌리지 말고 이 출력으로 답하세요)",
         "kept_report": ("참고: {path} 는 이미 {kept} 에서 재검증한 수정본입니다. {src} 의 판정이 담긴 {kept} 는 "
                         "그대로 두고 이번 결과는 {out} 에 씁니다"),
@@ -783,10 +810,20 @@ def propose_fix(text: str, groups: list[dict], bots: list[dict], urls: list[str]
 # ---------------------------------------------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------------------------------------------
-def render_matrix(bots: list[dict], urls: list[str], cells: list[dict], t) -> list[str]:
+def use_verdict_lines(n_bots: int, n_cells: int, urls_given: bool) -> bool:
+    """Small runs print one verdict line per cell (the evidence an agent pastes); large runs keep the matrix."""
+    return n_bots == 1 or n_cells <= LINE_CELLS or (urls_given and n_cells <= LINE_CELLS_GIVEN)
+
+
+def verdict_line(c: dict, t) -> str:
+    """'  GPTBot /shop/sale/x => allow @L5  (Allow: /shop/sale)' — the winning rule text, ' !' when the intent fails."""
+    return "  " + c["verdict"] + "  (" + (c["rule"] or t("rule_none")) + ")" + ("" if c["ok"] else " !")
+
+
+def render_matrix(bots: list[dict], urls: list[str], cells: list[dict], t, urls_given: bool = False) -> list[str]:
     by = {(c["bot"], c["url"]): c for c in cells}
-    if len(bots) == 1:  # one bot (a collector check): one line per URL reads better than one wide row
-        return ["  " + c["verdict"] + (" !" if not c["ok"] else "") for c in cells]
+    if use_verdict_lines(len(bots), len(cells), urls_given):
+        return [verdict_line(c, t) for c in cells]  # 칸마다 판정 줄 — stdout 에 근거가 그대로 남는다
     head = [t("col_bot")] + urls
     rows = [head]
     for b in bots:
@@ -807,12 +844,26 @@ def file_info(src: dict) -> dict:
     return {"path": src["path"], "sha256": src["sha256"], "bytes": src["bytes"], "lines": src["lines"]}
 
 
-def write_text(path: str, content: str) -> None:
-    try:
-        # newline="" 로 바이트를 그대로 쓴다 — 보고서에 적은 수정본 sha256 이 어느 OS 에서도 파일과 같아야 한다
-        Path(path).write_text(content, encoding="utf-8", newline="")
-    except OSError as e:
-        raise CliError(2, "err_write", path=path, why=e.strerror or str(e)) from e
+def write_outputs(items: list[tuple[str, str, bool]], replaced: list[str]) -> tuple[str, str] | None:
+    """Write each (path, content, typed by the user) in order. The paths were already probed, so a failure here is a
+    late surprise (a disk filling up, a folder changing): files this run created are removed again so no half result
+    stays behind. A typed path is then an input error (exit 2); a default path returns (path, why) like pick_writable.
+    """
+    done: list[str] = []
+    for path, content, explicit in items:
+        try:
+            # newline="" 로 바이트를 그대로 쓴다 — 보고서에 적은 수정본 sha256 이 어느 OS 에서도 파일과 같아야 한다
+            Path(path).write_text(content, encoding="utf-8", newline="")
+        except OSError as e:
+            for p in done:
+                if p not in replaced:
+                    Path(p).unlink(missing_ok=True)  # 이번 실행이 새로 만든 파일만 되돌린다
+            why = e.strerror or str(e)
+            if explicit:
+                raise CliError(2, "err_write", path=path, why=why) from e
+            return path, why
+        done.append(path)
+    return None
 
 
 def pick_report_path(out: str | None, inputs: list[dict]) -> tuple[str, dict | None]:
@@ -884,19 +935,58 @@ def refuse_input_clash(opt: str, out: str, inputs: list[tuple[str, str]]) -> Non
             raise CliError(2, "err_out_clash", opt=opt, path=out, what=what)
 
 
-def check_writable(path: str) -> None:
-    """Fail before the first write, so an unwritable report does not leave a fixed copy behind (or the reverse)."""
+def is_devnull(path: str | None) -> bool:
+    """--out /dev/null means "keep no report"; it is not a file to guard or to check."""
+    return path is not None and os.path.realpath(path) == os.path.realpath(os.devnull)
+
+
+def unwritable_reason(path: str) -> str | None:
+    """None when the path can be written, else the reason. Asked before the first write, so an unwritable report does
+    not leave a fixed copy behind (or the reverse).
+
+    os.access is not trusted: a sandbox or a read-only mount can say "writable" and still refuse the write. An existing
+    file is opened for writing without truncation; a new one is created and removed again, so nothing is left behind.
+    """
     p = Path(path)
     if p.is_dir():
-        raise CliError(2, "err_write", path=path, why=os.strerror(21))  # EISDIR
+        return os.strerror(errno.EISDIR)
     if not p.parent.is_dir():
-        raise CliError(2, "err_write", path=path, why=os.strerror(2))  # ENOENT
-    if p.exists() and not os.access(p, os.W_OK):
-        raise CliError(2, "err_write", path=path, why=os.strerror(13))  # EACCES
+        return os.strerror(errno.ENOENT)
+    try:
+        if p.exists():
+            os.close(os.open(p, os.O_WRONLY))  # 내용은 그대로 — 열 수 있는지만 본다
+        else:
+            os.close(os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL))
+            p.unlink()
+    except OSError as e:
+        return e.strerror or str(e)
+    return None
 
 
-def files_line(t, written: list[str], replaced: list[str]) -> str:
-    """The last line of every run: inputs untouched, and which outputs were new or replaced an existing file."""
+def pick_writable(targets: list[tuple[str, bool]]) -> tuple[str, str] | None:
+    """targets = (path, typed by the user). A path the user typed and cannot be written is an input error (exit 2).
+    A default path in the current folder that cannot be written returns (path, why): the run then writes nothing and
+    still prints every verdict, because the verdict lines on stdout are the result and the report only records them."""
+    blocked = None
+    for path, explicit in targets:
+        why = unwritable_reason(path)
+        if why is None:
+            continue
+        if explicit:
+            raise CliError(2, "err_write", path=path, why=why)
+        blocked = blocked or (path, why)
+    return blocked
+
+
+def files_line(t, written: list[str], replaced: list[str], devnull: str | None = None, blocked: bool = False) -> str:
+    """The last line of every run: inputs untouched, and which outputs were new, replaced, not kept or not written."""
+    if blocked:
+        return t("outputs_nothing")
+    if devnull is not None:  # --out /dev/null: no report, maybe a fixed copy
+        if not written:
+            return t("outputs_no_report", path=devnull)
+        key = "outputs_no_report_fixed_replaced" if replaced else "outputs_no_report_fixed"
+        return t(key, path=devnull, fixed=", ".join(written))
     if replaced:
         return t("outputs_replaced", files=", ".join(written), replaced=", ".join(replaced))
     return t("outputs_kept", files=", ".join(written))
@@ -919,22 +1009,27 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
 
     # 쓰기 전에 출력 경로를 모두 검사한다 — 거부된 실행은 폴더를 하나도 바꾸지 않는다
     out_path, kept = pick_report_path(args.out, [src])  # 수정본을 다시 검사해도 원본 보고서는 지킨다
+    no_report = is_devnull(out_path)  # --out /dev/null: 보고서를 남기지 않는다 (판정 줄은 그대로 찍는다)
     inputs = input_files(args, [path])
-    refuse_input_clash("--out", out_path, inputs)
+    if not no_report:
+        refuse_input_clash("--out", out_path, inputs)
     if violations:  # 수정본은 이번에 쓸 때만 입력과 겹치면 안 된다 (수정본을 다시 검사하는 실행은 그 파일이 입력이다)
         refuse_input_clash("--fixed-out", fixed_path, inputs)
         if is_crawlpolicy_report(fixed_path):
             raise CliError(2, "err_out_clash", opt="--fixed-out", path=fixed_path, what="what_old_report")
-    if same_file(out_path, fixed_path):
+    if not no_report and not is_devnull(fixed_path) and same_file(out_path, fixed_path):
         # 보고서와 수정본 자리는 이번에 수정안이 없어도 겹치면 안 된다. 사용자가 직접 준 옵션을 탓한다
         if args.fixed_out is not None:
             raise CliError(2, "err_out_clash", opt="--fixed-out", path=fixed_path, what="what_report")
         raise CliError(2, "err_out_clash", opt="--out", path=out_path, what="what_fixed")
-    if args.out is not None and Path(out_path).exists() and not is_crawlpolicy_report(out_path):
+    if args.out is not None and not no_report and Path(out_path).exists() and not is_crawlpolicy_report(out_path):
         raise CliError(2, "err_out_not_report", path=out_path)  # 직접 준 --out 이 사용자 파일을 덮지 않게
-    written = [out_path] + ([fixed_path] if violations else [])
-    for p in written:
-        check_writable(p)
+    targets = ([] if no_report else [(out_path, args.out is not None)])
+    if violations:
+        targets.append((fixed_path, args.fixed_out is not None))
+    # 직접 준 경로를 못 쓰면 종료 2. 기본 자리(현재 폴더)를 못 쓰면 아무것도 쓰지 않고 판정은 끝까지 찍는다
+    blocked = pick_writable(targets)
+    written = [] if blocked else [p for p, _ in targets]
     replaced = [p for p in written if Path(p).exists()]  # files: 줄에서 새로 만든 것과 바꾼 것을 정직하게 나눈다
 
     fix = None
@@ -971,16 +1066,20 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         if clauses else None,
         "fix": fix_report, "changed": [], "exit_code": exit_code,
     }
-    if fix:
-        write_text(fixed_path, fix["text"])
-    write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    contents = {fixed_path: fix["text"] if fix else "", out_path: json.dumps(report, indent=2, ensure_ascii=False) + "\n"}
+    if not blocked:
+        explicit = dict(targets)
+        blocked = write_outputs([(p, contents[p], explicit[p]) for p in written], replaced)
+    if blocked:  # 아무것도 남기지 않았다 — 판정·패치·재검증 줄은 아래에 그대로 찍는다
+        written, replaced = [], []
+        err_lines.append(t("warn_not_written", path=blocked[0], why=blocked[1]))
 
     for w in src["warnings"]:
         if w == "truncated":
             err_lines.append(t("warn_truncated", path=path))
         elif w == "fix_too_large":
             err_lines.append(t("warn_fix_large", path=fixed_path))
-    out_lines.extend(render_matrix(bots, urls, cells, t))
+    out_lines.extend(render_matrix(bots, urls, cells, t, urls_given=bool(given)))
     out_lines.append("")
     out_lines.append(t("legend"))
     out_lines.append(t("summary", cells=len(cells), allowed=allowed, denied=len(cells) - allowed, violations=len(violations)))
@@ -1005,7 +1104,8 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         out_lines.append(t("reverified", v=fix["violations_after"], c=fix["regressions"]))
         if not fix["verified"]:
             out_lines.append(t("not_verified"))
-        out_lines.append(t("wrote_fixed", path=fixed_path))
+        if fixed_path in written:
+            out_lines.append(t("wrote_fixed", path=fixed_path))
     notes = []
     for b in bots:
         if b["note"] and b["note"] not in notes:
@@ -1016,11 +1116,12 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         for n in notes:
             who = ", ".join(b["token"] for b in bots if b["note"] == n)
             out_lines.append(f"  {who}: " + t("note_" + n))
-    if kept:
-        out_lines.append(t("kept_report", out=out_path, **kept))
-    out_lines.append(t("wrote_report", path=out_path))
+    if out_path in written:
+        if kept:
+            out_lines.append(t("kept_report", out=out_path, **kept))
+        out_lines.append(t("wrote_report", path=out_path))
     # "파일을 고치지 말라"는 요청에서도 보고서를 지우지 않게, 입력은 그대로이고 무엇을 새로 썼는지·바꿨는지 마지막 줄에 밝힌다
-    out_lines.append(files_line(t, written, replaced))
+    out_lines.append(files_line(t, written, replaced, devnull=args.out if no_report else None, blocked=bool(blocked)))
     return exit_code
 
 
@@ -1054,12 +1155,23 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         "intent": None, "fix": None, "changed": changed, "exit_code": exit_code,
     }
     out_path, kept = pick_report_path(args.out, [old, new])  # 원본과 수정본의 diff 도 원본 보고서를 덮지 않는다
-    refuse_input_clash("--out", out_path, input_files(args, [args.old, args.new]))
-    if args.out is not None and Path(out_path).exists() and not is_crawlpolicy_report(out_path):
-        raise CliError(2, "err_out_not_report", path=out_path)  # 수정본(robots.fixed.txt) 같은 사용자 파일도 지킨다
-    check_writable(out_path)
-    replaced = [out_path] if Path(out_path).exists() else []
-    write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    no_report = is_devnull(out_path)  # --out /dev/null: 보고서 없이 바뀐 칸 줄만
+    written: list[str] = []
+    replaced: list[str] = []
+    blocked = None
+    if not no_report:
+        refuse_input_clash("--out", out_path, input_files(args, [args.old, args.new]))
+        if args.out is not None and Path(out_path).exists() and not is_crawlpolicy_report(out_path):
+            raise CliError(2, "err_out_not_report", path=out_path)  # 수정본(robots.fixed.txt) 같은 사용자 파일도 지킨다
+        blocked = pick_writable([(out_path, args.out is not None)])
+        if not blocked:
+            replaced = [out_path] if Path(out_path).exists() else []
+            content = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+            blocked = write_outputs([(out_path, content, args.out is not None)], replaced)
+            written = [] if blocked else [out_path]
+        if blocked:
+            replaced = []
+            err_lines.append(t("warn_not_written", path=blocked[0], why=blocked[1]))
     for src, name in ((old, args.old), (new, args.new)):
         for _ in src["warnings"]:
             err_lines.append(t("warn_truncated", path=name))
@@ -1075,10 +1187,12 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
             change = t("diff_gained") if ch["after"]["allowed"] else t("diff_lost")
             out_lines.append(t("diff_line", bot=ch["bot"], url=ch["url"], before=short(ch["before"]),
                                after=short(ch["after"]), change=change))
-    if kept:
-        out_lines.append(t("kept_report", out=out_path, **kept))
-    out_lines.append(t("wrote_report", path=out_path))
-    out_lines.append(files_line(t, [out_path], replaced))  # diff 는 보고서 하나만 쓴다
+    if written:
+        if kept:
+            out_lines.append(t("kept_report", out=out_path, **kept))
+        out_lines.append(t("wrote_report", path=out_path))
+    # diff 는 보고서 하나만 쓴다
+    out_lines.append(files_line(t, written, replaced, devnull=args.out if no_report else None, blocked=bool(blocked)))
     return exit_code
 
 
