@@ -100,7 +100,7 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py diff samples/robots.old.txt sa
 ```
 
 ![Only the changed cells between two robots.txt files](docs/images/diff.png)
-*7 of 75 cells changed: `Google-Extended` opened up, `CCBot` got blocked.*
+*7 of 75 cells changed: `Google-Extended` opened up (`(gained access)`), `CCBot` got blocked (`(lost access)`).*
 
 ## Intent syntax
 
@@ -136,7 +136,8 @@ Checked 2026-11-14. Bingbot is not in the table because its page could not be ve
 - Terminal: the matrix, violations, patch, `re-verified: ...`, provider notes. A single bot prints one `<bot> <url> => allow|deny @L<n>` line per URL.
 - `crawlpolicy-report.json` in the working folder: `source.sha256`, cells with `verdict` and `rule_line`, violations, `fix.verified`, `fix.violations_after`, `fix.regressions`. Keys are the same in both languages. Each run overwrites the file. If you run `check` or `diff` on the unchanged `robots.fixed.txt`, the original report is kept and the result goes to `crawlpolicy-report.fixed.json` with a note; the fix run itself already prints the re-verification, so that second run is not needed.
 - `robots.fixed.txt`: the fixed copy.
-- Exit codes: `0` intent holds or nothing changed; `1` violations found or verdicts changed; `2` input problem (missing file, HTML page, binary file, bad `--intent`); `3` no single robots.txt found (auto-detect looks in `./`, `public/`, `static/`, `app/`).
+- Every run ends with a `files:` line: no input file was changed, and the output files this run wrote (the report, plus `robots.fixed.txt` when a fix is proposed) are listed. If a report or `robots.fixed.txt` left by an earlier run was replaced, the line says so (`... already existed and was replaced`). They are output, not edits, so leave them in place. `--out` or `--fixed-out` pointing at an input file (robots.txt, `--urls`, `--bots-file`) or at each other is refused with the option name (exit 2), for example `error: --fixed-out urls.txt would overwrite the --urls file — choose another path`. An `--out` you pass yourself never replaces an existing file that is not a crawlpolicy report; a `--fixed-out` path you choose is replaced if it exists, and the `files:` line tells you. A malformed URL is a one-line error with exit 2.
+- Exit codes: `0` intent holds or nothing changed; `1` violations found or verdicts changed; `2` input problem (missing file, HTML page, binary file, bad `--intent`); `3` no single robots.txt found (auto-detect looks in `./`, `public/`, `static/`, `app/`). A bare `robots.txt` argument counts as left out when another candidate exists in `public/`, `static/` or `app/`: you get exit 3 and `error: found 2 robots.txt files: ... — pass one path, e.g. ./robots.txt`; `./robots.txt` or any other path is used as given.
 
 ![One-line errors with the fix hint](docs/images/errors.png)
 *Errors are one line that says how to fix the input, no traceback.*
@@ -160,11 +161,11 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | Stays quiet when it should not | 11/11 |
 | Tasks solved with the skill | 7/7 |
 | Tasks solved without it (baseline) | 0/7 |
-| Mean score gain (Δ) | +0.59 |
+| Mean score gain (Δ) | +0.61 |
 | Tasks that catch a broken script | 7/7 |
 | Codex CLI | not verified |
 
-Measured 2026-11-14 with Claude Code 2.1.322 · sonnet · 3 runs per case · codex-cli 0.154.0
+Measured 2026-11-15 with Claude Code 2.1.322 · sonnet · 3 runs per case · codex-cli 0.154.0
 <!-- skill-eval:end -->
 
 ## How it works
@@ -198,7 +199,7 @@ Good fits: checking a robots.txt before deploy when you want AI training crawler
 uv sync && uv run pytest -q
 ```
 
-122 tests pass (`uv run pytest -q`, Python 3.10, 3.12 and 3.14 in the CI matrix). The `evals/` folder holds 12 trigger cases (3 in Korean), 11 no-trigger cases and 7 task cases with fixtures, used by `claude plugin eval`.
+160 tests pass (`uv run pytest -q`, Python 3.10, 3.12 and 3.14 in the CI matrix). The `evals/` folder holds 12 trigger cases (3 in Korean), 11 no-trigger cases and 7 task cases with fixtures, used by `claude plugin eval`.
 
 ## License
 

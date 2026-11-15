@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-11-15
+
+### Fixed
+
+- Every output path is now checked against every input before anything is written: `--fixed-out` or `--out`
+  pointing at the robots.txt, the `--urls` file or the `--bots-file` file is refused with exit 2 (before, the fixed
+  copy could replace the `--urls` or `--bots-file` file while the `files:` line said no input was changed). A hard
+  link or another letter case of an input on a case-insensitive disk counts as the same file.
+- The report and the fixed copy can no longer share a path, even on a run that proposes no fix: `--out
+  robots.fixed.txt` is refused instead of turning an earlier fixed copy into a JSON report, and `--fixed-out` never
+  replaces a crawlpolicy report.
+- An explicit `--out` that names an existing file which is not a crawlpolicy report is refused.
+- Path errors name the option to change (`--fixed-out` or `--out`) and what it would overwrite, for example
+  `error: --fixed-out urls.txt would overwrite the --urls file — choose another path`.
+- The `files:` line says when a run replaced an existing report or fixed copy (`(robots.fixed.txt already existed
+  and was replaced)`) instead of saying it only added new files.
+- A URL with a broken IPv6 host such as `http://[bad` is an input error (exit 2) instead of a traceback with exit 1.
+- An unwritable report path stops the run before the fixed copy is written, so a failed run leaves no file behind.
+- README: the measurement table uses the 0.1.3 run (mean score gain +0.61) and the test count is 160.
+
+### Known issues
+
+- Still open from earlier releases: the contradictory verification lines for fixed copies over 500 KiB, the Applebot
+  fallback note shown even when the file has an `Applebot` group, the unneeded legend in single-bot line output, and
+  the recheck note that is printed but not stored in the JSON report.
+
+## [0.1.2] - 2026-11-14
+
+### Fixed
+
+- Every run now ends with a `files:` line saying no input file was changed and naming the new output files (the
+  JSON report, plus `robots.fixed.txt` when a fix is proposed). The skill instructions say these are output, not
+  edits, so an agent asked to "not edit any file" keeps them instead of deleting or redirecting them.
+- `check robots.txt` with a second candidate in `public/`, `static/` or `app/` now stops with exit 3 like a left-out
+  path instead of silently judging `./robots.txt`; the error suggests a path to pass (`./robots.txt` is used as
+  given). The skill's `check` example no longer names a file.
+- `--out` pointing at an input file or the fixed copy is refused (exit 2) instead of overwriting it.
+- `diff` lines end with `(gained access)` or `(lost access)`.
+
 ## [0.1.1] - 2026-11-14
 
 ### Fixed
