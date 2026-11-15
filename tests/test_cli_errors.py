@@ -30,7 +30,7 @@ def test_autodetect_many_exit3(cli, tmp_path, monkeypatch):
         (tmp_path / p).write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
     res = cli("check")
     assert res.code == 3 and res.out == ""
-    assert res.err == "error: found 2 robots.txt files: ./robots.txt, public/robots.txt — pass one path\n"
+    assert res.err == "error: found 2 robots.txt files: ./robots.txt, public/robots.txt — pass one path, e.g. ./robots.txt\n"
     assert "Traceback" not in res.err
 
 
@@ -49,6 +49,7 @@ CASES = {
     "intent-bot-not-in-bots": (["check", "robots.txt", "--bots", "GPTBot", "--intent", "ClaudeBot=deny"],
                                "--intent names bot 'ClaudeBot' that is not in --bots"),
     "bad-url": (["check", "robots.txt", "--url", "example.com/x"], "bad URL 'example.com/x'"),
+    "bad-ipv6-url": (["check", "robots.txt", "--bots", "GPTBot", "--url", "http://[bad"], "bad URL 'http://[bad'"),
     "missing-urls-file": (["check", "robots.txt", "--urls", "nope-urls.txt"], "file not found: nope-urls.txt"),
 }
 
@@ -97,7 +98,7 @@ def test_other_input_errors(cli, work):
 
 def test_fixed_out_never_overwrites_the_input(cli, work):
     res = cli("check", "robots.txt", "--intent", "training=deny", "--fixed-out", "robots.txt")
-    assert res.code == 2 and "is the input file itself" in res.err
+    assert res.code == 2 and res.err == "error: --fixed-out robots.txt would overwrite the input file — choose another path\n"
     assert "Disallow: /\n" in (work / "robots.txt").read_text(encoding="utf-8")
 
 
