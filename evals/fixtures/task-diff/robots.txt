@@ -1,14 +1,14 @@
-# Example site policy: keep AI training crawlers out, keep search crawlers in.
+# This month's policy for the recipe shop
 User-agent: *
-Disallow: /admin/
+Disallow: /checkout/
+Disallow: /cart/
 
-User-agent: GPTBot
-User-agent: CCBot
+User-agent: ClaudeBot
+User-agent: PerplexityBot
 Disallow: /
 
-User-agent: Google-Extended
-Disallow: /blog/
-Allow: /blog/public/
+User-agent: Google-CloudVertexBot
+Disallow: /
 
-User-agent: OAI-SearchBot
-Disallow: /admin/users
+User-agent: Applebot-Extended
+Disallow: /recipes/

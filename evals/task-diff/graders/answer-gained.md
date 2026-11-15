@@ -1,5 +1,5 @@
 ---
 type: regex
-pattern: 'google-extended[\s\S]{0,400}/admin/users|/admin/users[\s\S]{0,400}google-extended'
+pattern: 'applebot-extended(?:[^\n]*\n){0,3}[^\n]*/checkout|/checkout(?:[^\n]*\n){0,3}[^\n]*applebot-extended'
 flags: i
 ---

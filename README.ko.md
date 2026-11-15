@@ -47,7 +47,7 @@ robots.txt 를 건물 출입 규칙표라고 생각해 보세요. 표를 눈으�
 /plugin install crawlpolicy@crawlpolicy-skill
 ```
 
-**다른 에이전트(Agent Skills 표준)** — `skills/crawlpolicy` 를 에이전트의 스킬 폴더로 복사합니다. 플러그인 없이 Claude Code 를 쓰면 `.claude/skills/`.
+**다른 에이전트(Agent Skills 표준)** — `skills/crawlpolicy` 를 에이전트의 스킬 폴더로 복사합니다. 플러그인 없이 Claude Code 를 쓰면 `.claude/skills/`, Codex CLI 는 `.agents/skills/`.
 
 파이썬 3.10 이상(`python3 --version`)만 있으면 됩니다. 최소 리눅스 이미지에서는 `apt-get install -y python3`.
 
@@ -91,7 +91,7 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py check samples/robots.docs.txt 
 ```
 
 ![이긴 규칙 줄과 함께 보이는 수집기 판정](docs/images/collector.ko.png)
-*`DocsHarvester/2.1` 은 토큰 `DocsHarvester` 로 정규화되고, `/café/menu` 는 4번 줄의 규칙 `%C3%A9` 로 차단됩니다.*
+*작은 실행은 URL 마다 이긴 규칙과 함께 한 줄씩 출력합니다. `DocsHarvester/2.1` 은 토큰 `DocsHarvester` 로 정규화되고, `/café/menu` 는 4번 줄의 규칙 `/caf%C3%A9/` 로 차단됩니다.*
 
 파일 두 버전 비교(CI 에 유용: 종료 코드 1 이면 무언가 바뀐 것):
 
@@ -133,8 +133,9 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py diff samples/robots.old.txt sa
 
 ## 출력
 
-- 터미널: 판정 표, 위반, 패치, `re-verified: ...`(한국어 출력은 `재검증: ...`), 제공자 메모. 봇 하나만 물으면 URL 마다 `<bot> <url> => allow|deny @L<n>` 한 줄입니다.
+- 터미널: 판정 표, 위반, 패치, `re-verified: ...`(한국어 출력은 `재검증: ...`), 제공자 메모. 작은 실행(봇 하나, 12칸 이하, 또는 `--url`/`--urls` 로 URL 을 준 60칸 이하)은 판정 표 대신 칸마다 이긴 규칙 문장 또는 `(해당 규칙 없음)` 이 붙은 `<bot> <url> => allow|deny @L<n>  (<rule>)` 한 줄을 냅니다. 75칸짜리 데모처럼 큰 실행은 표를 그대로 씁니다.
 - 작업 폴더의 `crawlpolicy-report.json`: `source.sha256`, `verdict`·`rule_line` 이 있는 칸, 위반, `fix.verified`, `fix.violations_after`, `fix.regressions`. 키는 두 언어에서 같고, 실행할 때마다 덮어씁니다. 수정 안 한 `robots.fixed.txt` 에 `check`·`diff` 를 다시 돌리면 원래 report 는 그대로 두고 결과를 안내 문구와 함께 `crawlpolicy-report.fixed.json` 에 씁니다. fix 실행이 이미 재검증 결과를 출력하므로 이 두 번째 실행은 필요 없습니다.
+- `--out /dev/null`: 보고서를 남기지 않습니다. 판정과 패치는 그대로 출력하고 `files:` 줄이 보고서를 남기지 않았다고 알립니다. 작업 폴더에 쓸 수 없으면(읽기 전용·권한 없음) 아무것도 쓰지 않고 모든 판정·패치·`re-verified:` 줄을 출력하며 stderr 에 경고 한 줄을 냅니다. 종료 코드는 판정을 따릅니다. 직접 준 `--out` 에 쓸 수 없으면 입력 오류(종료 2)입니다.
 - 모든 실행은 `files:` 줄(한국어 출력은 `파일:`)로 끝납니다. 입력 파일은 하나도 바꾸지 않았고 이번에 쓴 출력 파일(보고서, 수정안이 있으면 `robots.fixed.txt` 도)이 적힙니다. 앞선 실행이 남긴 보고서나 `robots.fixed.txt` 를 바꿨다면 그 사실도 밝힙니다(`... already existed and was replaced`). 편집이 아니라 출력이니 그대로 두세요. `--out`·`--fixed-out` 이 입력 파일(robots.txt, `--urls`, `--bots-file`)이나 서로를 가리키면 옵션 이름을 적어 거부합니다(종료 2). 예: `error: --fixed-out urls.txt would overwrite the --urls file — choose another path`(한국어 출력은 `오류: ...`). 직접 준 `--out` 은 crawlpolicy 보고서가 아닌 기존 파일을 바꾸지 않습니다. 직접 고른 `--fixed-out` 경로에 파일이 이미 있으면 교체하고 `files:` 줄이 알려 줍니다. 잘못된 URL 은 한 줄 오류와 종료 2 입니다.
 - 종료 코드: `0` 의도 충족 또는 바뀐 것 없음, `1` 위반 발견 또는 판정 변경, `2` 입력 문제(파일 없음·HTML 페이지·바이너리·잘못된 `--intent`), `3` robots.txt 를 하나로 정하지 못함(자동 탐지는 `./`, `public/`, `static/`, `app/` 를 봅니다). 맨 이름 `robots.txt` 인자도 `public/`·`static/`·`app/` 에 다른 후보가 있으면 생략한 것으로 보고 종료 3 과 `error: found 2 robots.txt files: ... — pass one path, e.g. ./robots.txt`(한국어 출력: `오류: robots.txt 가 2개 있습니다: ... — 경로를 하나 넘기세요 (예: ./robots.txt)`)를 냅니다. `./robots.txt` 나 다른 경로는 그대로 씁니다.
 
@@ -160,9 +161,9 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | 필요 없을 때 안 불림 | 11/11 |
 | 스킬로 푼 작업 | 7/7 |
 | 스킬 없이 푼 작업(기준선) | 0/7 |
-| 평균 점수 차이(Δ) | +0.61 |
+| 평균 점수 차이(Δ) | +0.58 |
 | 가짜 스크립트를 잡아낸 비율 | 7/7 |
-| Codex CLI | 미검증 |
+| Codex CLI | 작업 7/7 통과 · 확인됨 |
 
 Claude Code 2.1.322 · sonnet · 케이스마다 3회 · 2026-11-15 측정 · codex-cli 0.154.0
 <!-- skill-eval:end -->
@@ -198,7 +199,7 @@ flowchart LR
 uv sync && uv run pytest -q
 ```
 
-테스트 160개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
+테스트 240개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
 
 ## 라이선스
 

@@ -1,7 +1,8 @@
-# URLs a RAG collector wants to fetch
+# Pages the ingester wants
 /
-/blog/public/faq
-/admin/users
-/café/menu
-/docs/guide.pdf
-/docs/guide.html
+/articles/soup
+/articles/bread
+/members/profile
+/crêpes/list
+/books/cookbook.epub
+/books/cookbook.html

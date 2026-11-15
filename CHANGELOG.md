@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.4] - 2026-11-15
+
+### Changed
+
+- Small runs print the evidence on stdout: with one bot, at most 12 cells, or URLs given with `--url`/`--urls` and at
+  most 60 cells, `check` prints one line per cell with the winning rule text, `<bot> <url> => allow|deny @L<n>
+  (<rule>)` or `(no matching rule)`, instead of the matrix. Larger runs (the 75-cell demo) keep the matrix.
+- `--out /dev/null` is accepted: no report is kept, the verdicts and the patch are printed as usual and the `files:`
+  line says no report was kept.
+- When the report cannot be written to the current folder (read-only folder, no permission), nothing is written, every
+  verdict, patch and `re-verified:` line is still printed, a one-line warning goes to stderr and the exit code follows
+  the verdicts. An explicit `--out` that cannot be written is still an input error (exit 2).
+- SKILL.md is shorter: run the script first even when the file looks simple, ask with `--bots`/`--url` for bot and URL
+  questions, and start the answer with the printed lines.
+- Eval set: the four task cases that ask not to edit any file grade the script's printed lines instead of the report
+  file, and two fixtures now cover an Allow/Disallow tie, a `$` anchor and two groups for the same bot.
+- README: the measurement table uses the 0.1.4 run (mean score gain +0.58, Codex CLI verified on 7/7 tasks).
+
 ## [0.1.3] - 2026-11-15
 
 ### Fixed

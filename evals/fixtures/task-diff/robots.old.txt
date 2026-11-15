@@ -1,12 +1,11 @@
-# Previous version of the site policy.
+# Last month's policy for the recipe shop
 User-agent: *
-Disallow: /admin/
+Disallow: /checkout/
+Disallow: /cart/
 
-User-agent: GPTBot
+User-agent: ClaudeBot
 Disallow: /
 
-User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Google-CloudVertexBot
 Disallow: /
-
-User-agent: OAI-SearchBot
-Disallow: /admin/users

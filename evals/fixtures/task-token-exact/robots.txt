@@ -3,3 +3,6 @@ Disallow: /private/
 
 User-agent: *
 Disallow: /
+
+User-agent: Applebot
+Allow: /private/press/

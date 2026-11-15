@@ -1,5 +1,5 @@
-# A documentation site that wants its guides read
+# A recipe site that lets collectors read its articles
 User-agent: *
-Disallow: /admin/
-Disallow: /caf%C3%A9/
-Disallow: /*.pdf$
+Disallow: /members/
+Disallow: /cr%C3%AApes/
+Disallow: /*.epub$
