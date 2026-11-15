@@ -162,7 +162,7 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | Stays quiet when it should not | 11/11 |
 | Tasks solved with the skill | 7/7 |
 | Tasks solved without it (baseline) | 0/7 |
-| Mean score gain (Δ) | +0.58 |
+| Mean score gain (Δ) | +0.59 |
 | Tasks that catch a broken script | 7/7 |
 | Codex CLI | 7/7 tasks · verified |
 

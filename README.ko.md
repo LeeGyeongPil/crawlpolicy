@@ -161,7 +161,7 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | 필요 없을 때 안 불림 | 11/11 |
 | 스킬로 푼 작업 | 7/7 |
 | 스킬 없이 푼 작업(기준선) | 0/7 |
-| 평균 점수 차이(Δ) | +0.58 |
+| 평균 점수 차이(Δ) | +0.59 |
 | 가짜 스크립트를 잡아낸 비율 | 7/7 |
 | Codex CLI | 작업 7/7 통과 · 확인됨 |
 
