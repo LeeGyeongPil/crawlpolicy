@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.5] - 2026-11-15
+
+### Fixed
+
+- English output uses the singular "cell" when the count is 1: `1 cell: 0 allow, 1 deny, 0 intent violations`,
+  `1 of 1 cell changed:` and `No verdict changed (1 cell compared).` Other counts and the Korean output are unchanged.
+
+### Changed
+
+- README: the test count is 241.
+
 ## [0.1.4] - 2026-11-15
 
 ### Changed

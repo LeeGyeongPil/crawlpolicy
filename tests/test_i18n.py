@@ -29,7 +29,7 @@ def test_message_keys_equal():
     fields = string.Formatter()
     for key, en in cp.MESSAGES["en"].items():
         ko = cp.MESSAGES["ko"][key]
-        names = lambda s: {f for _, f, _, _ in fields.parse(s) if f}      # noqa: E731
+        names = lambda s: {f for _, f, _, _ in fields.parse(s) if f} - {"cell_word"}  # noqa: E731 (cell_word is an English-only noun)
         assert names(en) == names(ko), key
         assert ko.strip() and en.strip(), key
 

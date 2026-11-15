@@ -199,7 +199,7 @@ flowchart LR
 uv sync && uv run pytest -q
 ```
 
-테스트 240개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
+테스트 241개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
 
 ## 라이선스
 

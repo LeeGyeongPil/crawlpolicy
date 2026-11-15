@@ -22,7 +22,7 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 MAX_BYTES = 500 * 1024  # RFC 9309 section 2.5: a crawler parses at least the first 500 KiB
 MAX_AUTO_URLS = 40
 MAX_PATCH_LINES = 40  # longer patches are cut on screen; the whole fixed copy is in the fixed file
@@ -112,7 +112,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "help_lang": "output language en|ko (default: CRAWLPOLICY_LANG, then LC_ALL/LC_MESSAGES/LANG)",
         "col_bot": "bot",
         "legend": "A = allow, D = deny, @L<n> = deciding line (@L0 = no rule applies), ! = intent violated",
-        "summary": "{cells} cells: {allowed} allow, {denied} deny, {violations} intent violations",
+        "summary": "{cells} {cell_word}: {allowed} allow, {denied} deny, {violations} intent violations",
         "no_intent": "No --intent given: verdicts only, nothing was compared.",
         "ok_all": "Intent holds in every checked cell.",
         "viol_head": "Intent violations ({n}):",
@@ -147,8 +147,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ignored_note": "{n} lines are not used for verdicts (see ignored_lines in the report)",
         "warn_truncated": "warning: {path} is larger than 500 KiB — only the first 500 KiB were read",
         "diff_head": "diff {old} -> {new}",
-        "diff_none": "No verdict changed ({cells} cells compared).",
-        "diff_some": "{n} of {cells} cells changed:",
+        "diff_none": "No verdict changed ({cells} {cell_word} compared).",
+        "diff_some": "{n} of {cells} {cell_word} changed:",
         "diff_line": "  {bot} {url}: {before} -> {after}  ({change})",
         "diff_gained": "gained access",
         "diff_lost": "lost access",
@@ -810,6 +810,11 @@ def propose_fix(text: str, groups: list[dict], bots: list[dict], urls: list[str]
 # ---------------------------------------------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------------------------------------------
+def cell_word(n: int) -> str:
+    """English noun for the cell count (singular for 1); Korean templates ignore it."""
+    return "cell" if n == 1 else "cells"
+
+
 def use_verdict_lines(n_bots: int, n_cells: int, urls_given: bool) -> bool:
     """Small runs print one verdict line per cell (the evidence an agent pastes); large runs keep the matrix."""
     return n_bots == 1 or n_cells <= LINE_CELLS or (urls_given and n_cells <= LINE_CELLS_GIVEN)
@@ -1082,7 +1087,7 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
     out_lines.extend(render_matrix(bots, urls, cells, t, urls_given=bool(given)))
     out_lines.append("")
     out_lines.append(t("legend"))
-    out_lines.append(t("summary", cells=len(cells), allowed=allowed, denied=len(cells) - allowed, violations=len(violations)))
+    out_lines.append(t("summary", cells=len(cells), cell_word=cell_word(len(cells)), allowed=allowed, denied=len(cells) - allowed, violations=len(violations)))
     if ignored:
         out_lines.append(t("ignored_note", n=len(ignored)))
     if not clauses:
@@ -1177,9 +1182,9 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
             err_lines.append(t("warn_truncated", path=name))
     out_lines.append(t("diff_head", old=args.old, new=args.new))
     if not changed:
-        out_lines.append(t("diff_none", cells=len(c_new)))
+        out_lines.append(t("diff_none", cells=len(c_new), cell_word=cell_word(len(c_new))))
     else:
-        out_lines.append(t("diff_some", n=len(changed), cells=len(c_new)))
+        out_lines.append(t("diff_some", n=len(changed), cells=len(c_new), cell_word=cell_word(len(c_new))))
         for ch in changed:
             def short(v: dict) -> str:
                 return ("allow" if v["allowed"] else "deny") + f" @L{v['rule_line'] or 0}"
