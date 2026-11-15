@@ -19,12 +19,13 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-VERSION = "0.1.1"
+VERSION = "0.1.3"
 MAX_BYTES = 500 * 1024  # RFC 9309 section 2.5: a crawler parses at least the first 500 KiB
 MAX_AUTO_URLS = 40
 MAX_PATCH_LINES = 40  # longer patches are cut on screen; the whole fixed copy is in the fixed file
 CANDIDATES = ("robots.txt", "public/robots.txt", "static/robots.txt", "app/robots.txt")
 DEFAULT_REPORT = "crawlpolicy-report.json"
+DEFAULT_FIXED = "robots.fixed.txt"
 FIXED_REPORT = "crawlpolicy-report.fixed.json"  # a later run on the unchanged fixed copy goes here (see pick_report_path)
 ROLES = ("training", "search", "user", "control", "ai", "all")
 TABLE_ROLES = ("training", "search", "user", "control", "other")
@@ -113,6 +114,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reverified": "re-verified: {v} violations, {c} changed cells",
         "not_verified": "The fix could not be fully verified — review the patch by hand before using it.",
         "wrote_report": "report: {path}",
+        "outputs_kept": ("files: no input file was changed; this run only added {files} as its record — these are "
+                         "new output files, not edits: leave them in place"),
+        "outputs_replaced": ("files: no input file was changed; this run wrote {files} as its record ({replaced} "
+                             "already existed and was replaced) — these are output files, not edits: leave them in "
+                             "place"),
         "wrote_fixed": "fixed copy: {path} (already re-checked by this run — answer from this output, no second run)",
         "kept_report": ("note: {path} is the fixed copy that {kept} already re-verified, so {kept} (the verdicts for "
                         "{src}) is kept and this run is written to {out}"),
@@ -125,7 +131,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "diff_head": "diff {old} -> {new}",
         "diff_none": "No verdict changed ({cells} cells compared).",
         "diff_some": "{n} of {cells} cells changed:",
-        "diff_line": "  {bot} {url}: {before} -> {after}",
+        "diff_line": "  {bot} {url}: {before} -> {after}  ({change})",
+        "diff_gained": "gained access",
+        "diff_lost": "lost access",
         "err_prefix": "error: ",
         "err_file_not_found": "file not found: {path} — pass the path to a saved robots.txt",
         "err_not_a_file": "not a file: {path} — pass the path to a saved robots.txt",
@@ -142,9 +150,16 @@ MESSAGES: dict[str, dict[str, str]] = {
         "err_bots_file_bad": ("bad --bots-file {path}: {why} — expected a JSON list of {{\"token\": ..., \"role\": "
                               "training|search|user|control|other}} objects"),
         "err_none_found": "no robots.txt found in ./, public/, static/, app/ — pass the path",
-        "err_many_found": "found {n} robots.txt files: {files} — pass one path",
+        "err_many_found": "found {n} robots.txt files: {files} — pass one path, e.g. {first}",
         "err_write": "cannot write {path}: {why} — choose a writable path",
-        "err_same_file": "--fixed-out {path} is the input file itself — choose another path",
+        "err_out_clash": "{opt} {path} would overwrite {what} — choose another path",
+        "err_out_not_report": "--out {path} already exists and is not a crawlpolicy report — choose another path",
+        "what_input": "the input file",
+        "what_urls": "the --urls file",
+        "what_bots_file": "the --bots-file file",
+        "what_report": "the report (--out)",
+        "what_fixed": "the fixed copy (--fixed-out)",
+        "what_old_report": "an earlier crawlpolicy report",
         "err_usage": "{detail} — run with --help to see the options",
         "err_unrecognized": "unrecognized arguments: {args} — run with --help to see the options",
         "err_invalid_choice": "'{value}' is not valid here — choose from: {choices}",
@@ -191,6 +206,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reverified": "재검증: 위반 {v}, 바뀐 정상 칸 {c}",
         "not_verified": "수정안을 끝까지 검증하지 못했습니다 — 쓰기 전에 패치를 직접 확인하세요.",
         "wrote_report": "보고서: {path}",
+        "outputs_kept": ("파일: 입력 파일은 하나도 바꾸지 않았고, 이번 실행의 기록으로 {files} 만 새로 썼습니다 — 편집이 아니라 "
+                         "새 출력 파일이니 그대로 두세요"),
+        "outputs_replaced": ("파일: 입력 파일은 하나도 바꾸지 않았고, 이번 실행의 기록으로 {files} 를 썼습니다 (이미 있던 "
+                             "{replaced} 는 새 내용으로 바꿈) — 편집이 아니라 출력 파일이니 그대로 두세요"),
         "wrote_fixed": "수정본: {path} (이번 실행에서 이미 재검증함 — 다시 돌리지 말고 이 출력으로 답하세요)",
         "kept_report": ("참고: {path} 는 이미 {kept} 에서 재검증한 수정본입니다. {src} 의 판정이 담긴 {kept} 는 "
                         "그대로 두고 이번 결과는 {out} 에 씁니다"),
@@ -203,7 +222,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "diff_head": "비교 {old} -> {new}",
         "diff_none": "바뀐 판정이 없습니다 ({cells}칸 비교).",
         "diff_some": "{cells}칸 중 {n}칸이 바뀌었습니다:",
-        "diff_line": "  {bot} {url}: {before} -> {after}",
+        "diff_line": "  {bot} {url}: {before} -> {after}  ({change})",
+        "diff_gained": "접근 허용으로 바뀜",
+        "diff_lost": "접근 차단으로 바뀜",
         "err_prefix": "오류: ",
         "err_file_not_found": "파일이 없습니다: {path} — 저장한 robots.txt 경로를 넘기세요",
         "err_not_a_file": "파일이 아닙니다: {path} — 저장한 robots.txt 경로를 넘기세요",
@@ -220,9 +241,16 @@ MESSAGES: dict[str, dict[str, str]] = {
         "err_bots_file_bad": ("--bots-file {path} 가 잘못됐습니다: {why} — {{\"token\": ..., \"role\": "
                               "training|search|user|control|other}} 객체의 JSON 목록이어야 합니다"),
         "err_none_found": "robots.txt 를 ./, public/, static/, app/ 에서 찾지 못했습니다 — 경로를 넘기세요",
-        "err_many_found": "robots.txt 가 {n}개 있습니다: {files} — 경로를 하나 넘기세요",
+        "err_many_found": "robots.txt 가 {n}개 있습니다: {files} — 경로를 하나 넘기세요 (예: {first})",
         "err_write": "{path} 에 쓸 수 없습니다: {why} — 쓸 수 있는 경로를 고르세요",
-        "err_same_file": "--fixed-out {path} 가 입력 파일 자체입니다 — 다른 경로를 고르세요",
+        "err_out_clash": "{opt} {path} 는 {what} 을(를) 덮어씁니다 — 다른 경로를 고르세요",
+        "err_out_not_report": "--out {path} 는 이미 있는 파일이고 crawlpolicy 보고서가 아닙니다 — 다른 경로를 고르세요",
+        "what_input": "입력 파일",
+        "what_urls": "--urls 파일",
+        "what_bots_file": "--bots-file 파일",
+        "what_report": "보고서(--out)",
+        "what_fixed": "수정본(--fixed-out)",
+        "what_old_report": "이전 crawlpolicy 보고서",
         "err_usage": "인자가 잘못됐습니다 ({detail}) — --help 로 옵션을 확인하세요",
         "err_unrecognized": "알 수 없는 인자: {args} — --help 로 옵션을 확인하세요",
         "err_invalid_choice": "'{value}' 는 여기서 쓸 수 없는 값입니다 — 다음 중 고르세요: {choices}",
@@ -449,14 +477,34 @@ def autodetect_robots() -> str:
     if not found:
         raise CliError(3, "err_none_found")
     if len(found) > 1:
-        raise CliError(3, "err_many_found", n=len(found), files=", ".join(("./" + f) if "/" not in f else f for f in found))
+        shown = [("./" + f) if "/" not in f else f for f in found]
+        raise CliError(3, "err_many_found", n=len(found), files=", ".join(shown), first=shown[0])
     return found[0]
+
+
+def pick_robots(arg: str | None) -> str:
+    """The file check reads: the given path, or auto-detect when it was left out.
+
+    The bare default name `robots.txt` is what people and agents type when they mean "the robots.txt" without
+    choosing one. When public/, static/ or app/ also holds a robots.txt, silently judging ./robots.txt could answer
+    for the wrong file, so that case stops like a left-out path (exit 3). `./robots.txt` or any other path is used
+    as given.
+    """
+    if not arg:
+        return autodetect_robots()
+    if arg == "robots.txt" and sum(1 for c in CANDIDATES if Path(c).is_file()) > 1:
+        return autodetect_robots()  # 후보가 여럿이면 종료 3 — 어느 파일인지 사용자에게 물어야 한다
+    return arg
 
 
 def check_url(url: str) -> str:
     u = url.strip()
     if re.search(r"\s", u) or not (u.startswith("/") and not u.startswith("//") or re.match(r"https?://[^/\s]+", u)):
         raise CliError(2, "err_bad_url", url=url)
+    try:
+        urllib.parse.urlsplit(u)  # 'http://[bad' 같은 깨진 IPv6 호스트는 여기서 막는다 — 나중에 traceback·종료 1 이 되지 않게
+    except ValueError as e:
+        raise CliError(2, "err_bad_url", url=url) from e
     return u
 
 
@@ -794,8 +842,68 @@ def pick_report_path(out: str | None, inputs: list[dict]) -> tuple[str, dict | N
     return DEFAULT_REPORT, None
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# Output guard: every path the run writes is checked against every path it reads (and against each other) before
+# anything is written, so a refused run leaves the folder exactly as it was.
+# ---------------------------------------------------------------------------------------------------------------
+def same_file(a: str, b: str) -> bool:
+    """True when two paths name one file.
+
+    Comparing resolved paths is not enough: a hard link, or another letter case on a case-insensitive disk (the
+    macOS and Windows default), names the same file under a different path. os.path.samefile compares the inode.
+    """
+    if Path(a).resolve() == Path(b).resolve():
+        return True
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False  # 둘 중 하나가 아직 없으면 같은 파일일 수 없다
+
+
+def is_crawlpolicy_report(path: str) -> bool:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("tool") == "crawlpolicy"
+
+
+def input_files(args, robots_paths: list[str]) -> list[tuple[str, str]]:
+    """Every file this run reads, as (what-key for the error message, path)."""
+    files = [("what_input", p) for p in robots_paths]
+    if args.urls:
+        files.append(("what_urls", args.urls))
+    if args.bots_file:
+        files.append(("what_bots_file", args.bots_file))
+    return files
+
+
+def refuse_input_clash(opt: str, out: str, inputs: list[tuple[str, str]]) -> None:
+    for what, path in inputs:
+        if same_file(out, path):
+            raise CliError(2, "err_out_clash", opt=opt, path=out, what=what)
+
+
+def check_writable(path: str) -> None:
+    """Fail before the first write, so an unwritable report does not leave a fixed copy behind (or the reverse)."""
+    p = Path(path)
+    if p.is_dir():
+        raise CliError(2, "err_write", path=path, why=os.strerror(21))  # EISDIR
+    if not p.parent.is_dir():
+        raise CliError(2, "err_write", path=path, why=os.strerror(2))  # ENOENT
+    if p.exists() and not os.access(p, os.W_OK):
+        raise CliError(2, "err_write", path=path, why=os.strerror(13))  # EACCES
+
+
+def files_line(t, written: list[str], replaced: list[str]) -> str:
+    """The last line of every run: inputs untouched, and which outputs were new or replaced an existing file."""
+    if replaced:
+        return t("outputs_replaced", files=", ".join(written), replaced=", ".join(replaced))
+    return t("outputs_kept", files=", ".join(written))
+
+
 def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
-    path = args.robots or autodetect_robots()
+    path = pick_robots(args.robots)
     src = read_robots(path)
     table = load_bot_table(args.bots_file)
     bots = resolve_bots(args.bots, table)
@@ -805,11 +913,30 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
     urls = given or sample_urls(groups, clauses)
     if not urls:
         raise CliError(2, "err_no_urls")
-    fixed_path = args.fixed_out
+    fixed_path = args.fixed_out or DEFAULT_FIXED
     cells = build_cells(groups, bots, urls, clauses)
     violations = [c for c in cells if not c["ok"]]
-    if violations and Path(fixed_path).resolve() == Path(path).resolve():
-        raise CliError(2, "err_same_file", path=fixed_path)
+
+    # 쓰기 전에 출력 경로를 모두 검사한다 — 거부된 실행은 폴더를 하나도 바꾸지 않는다
+    out_path, kept = pick_report_path(args.out, [src])  # 수정본을 다시 검사해도 원본 보고서는 지킨다
+    inputs = input_files(args, [path])
+    refuse_input_clash("--out", out_path, inputs)
+    if violations:  # 수정본은 이번에 쓸 때만 입력과 겹치면 안 된다 (수정본을 다시 검사하는 실행은 그 파일이 입력이다)
+        refuse_input_clash("--fixed-out", fixed_path, inputs)
+        if is_crawlpolicy_report(fixed_path):
+            raise CliError(2, "err_out_clash", opt="--fixed-out", path=fixed_path, what="what_old_report")
+    if same_file(out_path, fixed_path):
+        # 보고서와 수정본 자리는 이번에 수정안이 없어도 겹치면 안 된다. 사용자가 직접 준 옵션을 탓한다
+        if args.fixed_out is not None:
+            raise CliError(2, "err_out_clash", opt="--fixed-out", path=fixed_path, what="what_report")
+        raise CliError(2, "err_out_clash", opt="--out", path=out_path, what="what_fixed")
+    if args.out is not None and Path(out_path).exists() and not is_crawlpolicy_report(out_path):
+        raise CliError(2, "err_out_not_report", path=out_path)  # 직접 준 --out 이 사용자 파일을 덮지 않게
+    written = [out_path] + ([fixed_path] if violations else [])
+    for p in written:
+        check_writable(p)
+    replaced = [p for p in written if Path(p).exists()]  # files: 줄에서 새로 만든 것과 바꾼 것을 정직하게 나눈다
+
     fix = None
     fix_report = None
     if violations:
@@ -844,7 +971,6 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         if clauses else None,
         "fix": fix_report, "changed": [], "exit_code": exit_code,
     }
-    out_path, kept = pick_report_path(args.out, [src])  # 수정본을 다시 검사해도 원본 보고서는 지킨다
     if fix:
         write_text(fixed_path, fix["text"])
     write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
@@ -893,6 +1019,8 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
     if kept:
         out_lines.append(t("kept_report", out=out_path, **kept))
     out_lines.append(t("wrote_report", path=out_path))
+    # "파일을 고치지 말라"는 요청에서도 보고서를 지우지 않게, 입력은 그대로이고 무엇을 새로 썼는지·바꿨는지 마지막 줄에 밝힌다
+    out_lines.append(files_line(t, written, replaced))
     return exit_code
 
 
@@ -926,6 +1054,11 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         "intent": None, "fix": None, "changed": changed, "exit_code": exit_code,
     }
     out_path, kept = pick_report_path(args.out, [old, new])  # 원본과 수정본의 diff 도 원본 보고서를 덮지 않는다
+    refuse_input_clash("--out", out_path, input_files(args, [args.old, args.new]))
+    if args.out is not None and Path(out_path).exists() and not is_crawlpolicy_report(out_path):
+        raise CliError(2, "err_out_not_report", path=out_path)  # 수정본(robots.fixed.txt) 같은 사용자 파일도 지킨다
+    check_writable(out_path)
+    replaced = [out_path] if Path(out_path).exists() else []
     write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
     for src, name in ((old, args.old), (new, args.new)):
         for _ in src["warnings"]:
@@ -938,10 +1071,14 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         for ch in changed:
             def short(v: dict) -> str:
                 return ("allow" if v["allowed"] else "deny") + f" @L{v['rule_line'] or 0}"
-            out_lines.append(t("diff_line", bot=ch["bot"], url=ch["url"], before=short(ch["before"]), after=short(ch["after"])))
+            # 어느 봇이 접근을 얻었는지·잃었는지 줄마다 낱말로 밝힌다 (allow/deny 화살표만으로는 답이 흔들린다)
+            change = t("diff_gained") if ch["after"]["allowed"] else t("diff_lost")
+            out_lines.append(t("diff_line", bot=ch["bot"], url=ch["url"], before=short(ch["before"]),
+                               after=short(ch["after"]), change=change))
     if kept:
         out_lines.append(t("kept_report", out=out_path, **kept))
     out_lines.append(t("wrote_report", path=out_path))
+    out_lines.append(files_line(t, [out_path], replaced))  # diff 는 보고서 하나만 쓴다
     return exit_code
 
 
@@ -999,7 +1136,8 @@ def build_parser(t) -> argparse.ArgumentParser:
     c = sub.add_parser("check", help=t("help_check"), description=t("help_check"))
     c.add_argument("robots", nargs="?", metavar="ROBOTS", help=t("help_robots"))
     c.add_argument("--intent", metavar="CLAUSES", help=t("help_intent"))
-    c.add_argument("--fixed-out", default="robots.fixed.txt", metavar="FILE", help=t("help_fixed_out"))
+    # None = DEFAULT_FIXED; 직접 준 값인지 알아야 경로 충돌 오류에서 그 옵션을 탓할 수 있다
+    c.add_argument("--fixed-out", default=None, metavar="FILE", help=t("help_fixed_out"))
     common(c)
     d = sub.add_parser("diff", help=t("help_diff"), description=t("help_diff"))
     d.add_argument("old", metavar="OLD", help=t("help_old"))
@@ -1032,7 +1170,8 @@ def main(argv: list[str] | None = None) -> int:
         args = build_parser(t).parse_args(argv)
         code = run_check(args, t, out_lines, err_lines) if args.command == "check" else run_diff(args, t, out_lines, err_lines)
     except CliError as e:
-        err_lines.append(t("err_prefix") + t(e.key, **e.kw))
+        kw = {k: (t(v) if k == "what" else v) for k, v in e.kw.items()}  # 'what' 은 메시지 키라 언어별로 바꾼다
+        err_lines.append(t("err_prefix") + t(e.key, **kw))
         code = e.code
     except SystemExit as e:  # --help / --version already printed by argparse
         return int(e.code or 0)

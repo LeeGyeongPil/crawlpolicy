@@ -19,7 +19,7 @@ The bundled script is `scripts/crawlpolicy.py` inside `<skill-dir>`; run it by i
 Check a file against what the user wants (also fixes and re-verifies when the intent is violated):
 
 ```
-python3 <skill-dir>/scripts/crawlpolicy.py check robots.txt --intent "training=deny; search=allow; all:/admin/=deny" --lang en
+python3 <skill-dir>/scripts/crawlpolicy.py check --intent "training=deny; search=allow; all:/admin/=deny" --lang en
 ```
 
 Compare two versions:
@@ -28,8 +28,9 @@ Compare two versions:
 python3 <skill-dir>/scripts/crawlpolicy.py diff robots.old.txt robots.txt --lang en
 ```
 
-- Leave out `robots.txt` when the user did not name the file: the script uses the only one of `./robots.txt`,
-  `public/`, `static/`, `app/`. Use `--lang ko` for a Korean answer.
+- Give `check` no file when the user says "robots.txt", "our robots.txt" or "the one here": the script uses the
+  only one of `./robots.txt`, `public/`, `static/`, `app/` and stops with exit 3 when there are several. Pass a
+  path only when the user gave a path or another file name. Use `--lang ko` for a Korean answer.
 - Leave out `--intent` when the user only asks whether a bot may fetch something. Then add `--bots "GPTBot"` and
   `--url /path` (repeat `--url`) or `--urls FILE` (one URL or path per line). A collector name such as
   `DocsHarvester/2.1` is accepted in `--bots`. Without `--url` the script judges `/` and every path named in the rules.
@@ -38,6 +39,11 @@ python3 <skill-dir>/scripts/crawlpolicy.py diff robots.old.txt robots.txt --lang
   default `/`. A later clause overrides an earlier one; cells no clause covers are not checked.
 - Run it once and answer from that run. That run already re-checked the fixed copy, so do not run `check` or `diff`
   on `robots.fixed.txt` afterwards. Never edit the user's robots.txt: the fix is the copy `robots.fixed.txt`.
+- The script never changes the user's files: robots.txt and every other input stay as they are. Each run writes its
+  JSON report (and `robots.fixed.txt` when a fix is proposed) to the current folder as the record of the verdicts,
+  replacing the ones an earlier run left; the last `files:` line names them. These are output files, not edits,
+  so they stay even when the user says "do not edit any file":
+  do not delete, move or redirect them and do not pass `--out`.
 
 ## Reading the output
 
@@ -46,11 +52,13 @@ python3 <skill-dir>/scripts/crawlpolicy.py diff robots.old.txt robots.txt --lang
 - Violations come as the same verdict lines, then a patch and `re-verified: <n> violations, <m> changed cells`. Zero
   and zero means the fixed copy meets the intent without changing any other cell. Anything else: say the fix is not
   verified and show what is left.
+- `diff` prints one line per changed cell ending in `(gained access)` or `(lost access)`; list those bots and URLs.
 - Exit code: 0 intent holds or nothing changed; 1 violations found or verdicts changed; 2 an input problem; 3 no single
   robots.txt could be picked.
 
 ## Report back
 
+- For "may this bot fetch these URLs", answer every bot and URL asked with allowed or blocked and the deciding line.
 - Paste the violation lines and the patch as printed, then say in plain words which bots end up allowed and blocked.
   Explain the usual cause in one sentence: a bot group without the `*` rules does not inherit them.
 - Mention the provider notes when printed: user-request bots such as ChatGPT-User may not follow robots.txt, and
