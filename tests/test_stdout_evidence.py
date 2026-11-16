@@ -35,7 +35,7 @@ def _verdict_lines(out: str) -> list[re.Match]:
     (["check", "robots.docs.txt", "--bots", "DocsHarvester/2.1", "--urls", "urls.txt"], 6),    # one bot, a URL file
     (["check", "robots.txt", "--bots", "GPTBot,ClaudeBot", "--url", "/", "--url", "/admin/x"], 4),
     (["check", "robots.txt", "--bots", "GPTBot,Googlebot"], 10),                               # <= 12 cells, auto URLs
-    (["check", "robots.txt", "--url", "/", "--url", "/admin/", "--url", "/blog/", "--url", "/blog/public/"], 60),
+    (["check", "robots.txt", "--url", "/", "--url", "/admin/", "--url", "/blog/", "--url", "/blog/public/"], 68),
 ])
 def test_small_runs_print_verdict_lines_with_rule(cli, work, report, argv, cells):
     res = cli(*argv)
@@ -70,10 +70,10 @@ def test_rfc_decisive_cells_print_their_rule(cli, tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("argv", [
-    ["check", "robots.txt"],                                                      # 15 bots x 5 auto URLs = 75
+    ["check", "robots.txt"],                                                      # 17 bots x 5 auto URLs = 85
     ["check", "robots.txt", "--intent", DEMO_INTENT],
     ["check", "robots.txt", "--bots", "GPTBot,ClaudeBot,CCBot"],                  # 15 cells, auto URLs
-    ["check", "robots.txt", "--url", "/", "--url", "/a", "--url", "/b", "--url", "/c", "--url", "/d"],   # 75 given
+    ["check", "robots.txt", "--url", "/", "--url", "/a", "--url", "/b", "--url", "/c", "--url", "/d"],   # 85 given
 ])
 def test_large_runs_keep_the_matrix(cli, work, argv):
     res = cli(*argv)
@@ -85,7 +85,7 @@ def test_large_runs_keep_the_matrix(cli, work, argv):
 def test_line_mode_thresholds():
     assert cp.use_verdict_lines(1, 500, False) and cp.use_verdict_lines(3, 12, False)
     assert not cp.use_verdict_lines(3, 13, False)
-    assert cp.use_verdict_lines(15, 60, True) and not cp.use_verdict_lines(15, 61, True)
+    assert cp.use_verdict_lines(17, 68, True) and not cp.use_verdict_lines(17, 69, True)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -143,7 +143,7 @@ def test_unwritable_default_report_still_prints_verdicts(cli, work, monkeypatch)
     before = _digest(work)
     _assert_full_result_without_files(cli("check", "robots.txt", "--intent", DEMO_INTENT), work, before)
     d = cli("diff", "robots.old.txt", "robots.txt")
-    assert d.code == 1 and "7 of 75 cells changed:" in d.out and d.err.startswith("warning: cannot write")
+    assert d.code == 1 and "7 of 85 cells changed:" in d.out and d.err.startswith("warning: cannot write")
     assert d.out.rstrip("\n").split("\n")[-1].startswith("files: no input file was changed and nothing was written")
     small = cli("check", "robots.txt", "--bots", "GPTBot", "--url", "/blog/")
     assert small.code == 0 and "  GPTBot /blog/ => deny @L7  (Disallow: /)" in small.out

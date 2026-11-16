@@ -44,14 +44,14 @@ def test_outputs_per_language(cli, work, report):
     rep_en = report(work)
     ko = cli("check", "robots.txt", "--intent", DEMO_INTENT, "--lang", "ko")
     rep_ko = report(work)
-    assert "Intent violations (11):" in en.out and "re-verified: 0 violations, 0 changed cells" in en.out
-    assert "의도 위반 (11건):" in ko.out and "재검증: 위반 0, 바뀐 정상 칸 0" in ko.out
+    assert "Intent violations (17):" in en.out and "re-verified: 0 violations, 0 changed cells" in en.out
+    assert "의도 위반 (17건):" in ko.out and "재검증: 위반 0, 바뀐 정상 칸 0" in ko.out
     assert "re-verified" not in ko.out and "Intent violations" not in ko.out and "재검증" not in en.out
     assert en.out.splitlines()[0].startswith("bot ") and ko.out.splitlines()[0].startswith("봇 ")
     assert rep_en == rep_ko                      # JSON keys and values are language neutral
     d_en = cli("diff", "robots.old.txt", "robots.txt", "--lang", "en")
     d_ko = cli("diff", "robots.old.txt", "robots.txt", "--lang", "ko")
-    assert "7 of 75 cells changed" in d_en.out and "75칸 중 7칸이 바뀌었습니다" in d_ko.out
+    assert "7 of 85 cells changed" in d_en.out and "85칸 중 7칸이 바뀌었습니다" in d_ko.out
 
 
 def test_env_variable_switches_language(cli, work, monkeypatch):

@@ -41,7 +41,7 @@ def test_fix_keeps_every_other_cell(cli, work, report):
 def test_star_fallback_bot_gets_a_group_that_copies_star_rules(cli, work):
     cli("check", "robots.txt", "--intent", DEMO_INTENT)
     fixed = (work / "robots.fixed.txt").read_text(encoding="utf-8")
-    assert "User-agent: ClaudeBot\nUser-agent: Applebot-Extended\nDisallow: /admin/\nDisallow: /\n" in fixed
+    assert "User-agent: ClaudeBot\nUser-agent: Applebot-Extended\nUser-agent: Meta-ExternalAgent\nUser-agent: Amazonbot\nDisallow: /admin/\nDisallow: /\n" in fixed
 
 
 def test_prefix_fix_when_a_longer_allow_wins(cli, work):
@@ -116,8 +116,8 @@ def test_report_fields_and_verdict_format(cli, work, report):
     pattern = re.compile(r"^[A-Za-z_-]+ \S+ => (allow|deny) @L\d+$")
     assert all(pattern.match(c["verdict"]) for c in rep["cells"])
     assert list(rep["cells"][0]) == ["bot", "url", "allowed", "rule_line", "rule", "group", "intent", "ok", "verdict"]
-    assert rep["summary"]["cells"] == len(rep["cells"]) == 15 * 5
-    assert rep["summary"]["violations"] == 11
+    assert rep["summary"]["cells"] == len(rep["cells"]) == 17 * 5
+    assert rep["summary"]["violations"] == 17
     assert rep["fix"]["added"] and rep["fix"]["patch"].startswith("--- robots.txt")
     assert rep["exit_code"] == 1
 
@@ -127,7 +127,7 @@ def test_bot_names_are_normalized_in_the_report(cli, work, report):
     assert res.code == 0
     rep = report(work)
     assert rep["bots"] == [{"token": "DocsHarvester", "role": "other", "ai": False, "provider": None,
-                            "group": "star", "note": None}]
+                            "group": "star", "note": None, "source": None}]
     assert rep["urls_source"] == "given"
     verdicts = {c["url"]: c["verdict"] for c in rep["cells"]}
     assert verdicts["/café/menu"] == "DocsHarvester /café/menu => deny @L4"      # %C3%A9 rule vs raw UTF-8 URL
@@ -151,7 +151,7 @@ def test_auto_urls_are_used_when_none_given(cli, work, report):
 
 def test_role_names_expand_in_bots(cli, work, report):
     cli("check", "robots.txt", "--bots", "training,Googlebot")
-    assert [b["token"] for b in report(work)["bots"]] == ["GPTBot", "ClaudeBot", "CCBot", "Googlebot"]
+    assert [b["token"] for b in report(work)["bots"]] == ["GPTBot", "ClaudeBot", "CCBot", "Meta-ExternalAgent", "Amazonbot", "Googlebot"]
 
 
 def test_bots_file_replaces_the_table(cli, work, report):
@@ -160,3 +160,17 @@ def test_bots_file_replaces_the_table(cli, work, report):
     rep = report(work)
     assert [b["token"] for b in rep["bots"]] == ["MyBot"]
     assert rep["bots"][0]["ai"] is True
+
+
+def test_default_table_has_meta_and_amazon_as_training_bots(cli, work, report):
+    """Meta-ExternalAgent and Amazonbot are built in with a source URL; training=deny checks them without --bots."""
+    cli("check", "robots.txt", "--intent", "training=deny")
+    rep = report(work)
+    bots = {b["token"]: b for b in rep["bots"]}
+    assert len(bots) == 17
+    for token, provider in (("Meta-ExternalAgent", "Meta"), ("Amazonbot", "Amazon")):
+        assert bots[token]["role"] == "training" and bots[token]["provider"] == provider
+        assert bots[token]["source"].startswith("https://")
+    bad = {c["bot"] for c in rep["cells"] if not c["ok"]}
+    assert {"Meta-ExternalAgent", "Amazonbot"} <= bad
+    assert rep["exit_code"] == 1

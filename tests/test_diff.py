@@ -15,7 +15,7 @@ def test_changed_cells_only(cli, work, report):
                                                           "Google-Extended /admin/users => allow @L0")
     assert pairs[("CCBot", "/")] == ("CCBot / => allow @L0", "CCBot / => deny @L7")
     assert ("GPTBot", "/") not in pairs                       # same verdict, only the rule line may differ
-    assert "7 of 75 cells changed" in res.out
+    assert "7 of 85 cells changed" in res.out
 
 
 def test_identical_exit0(cli, work, report):

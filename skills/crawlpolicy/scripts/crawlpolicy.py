@@ -22,14 +22,14 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 MAX_BYTES = 500 * 1024  # RFC 9309 section 2.5: a crawler parses at least the first 500 KiB
 MAX_AUTO_URLS = 40
 MAX_PATCH_LINES = 40  # longer patches are cut on screen; the whole fixed copy is in the fixed file
 # Verdict-line mode (one "<bot> <url> => allow @L3  (Allow: /x)" line per cell instead of the matrix): one bot, at most
-# LINE_CELLS cells, or URLs given with --url/--urls and at most LINE_CELLS_GIVEN cells (the built-in 15 bots x 4 URLs).
+# LINE_CELLS cells, or URLs given with --url/--urls and at most LINE_CELLS_GIVEN cells (the built-in table x 4 URLs).
 LINE_CELLS = 12
-LINE_CELLS_GIVEN = 60
+LINE_CELLS_GIVEN = 68  # 17 built-in bots x 4 URLs
 CANDIDATES = ("robots.txt", "public/robots.txt", "static/robots.txt", "app/robots.txt")
 DEFAULT_REPORT = "crawlpolicy-report.json"
 DEFAULT_FIXED = "robots.fixed.txt"
@@ -39,11 +39,11 @@ TABLE_ROLES = ("training", "search", "user", "control", "other")
 UA_TOKEN = re.compile(r"[A-Za-z_-]+")
 
 # ---------------------------------------------------------------------------------------------------------------
-# Built-in crawler table. Tokens and roles come from each provider's own documentation (checked 2026-11-14).
+# Built-in crawler table. Tokens and roles come from each provider's own documentation (checked 2026-11-16).
 # Bingbot is left out on purpose: its page could not be verified. Pass any token with --bots or replace the whole
 # table with --bots-file.
 # ---------------------------------------------------------------------------------------------------------------
-BOTS_CHECKED = "2026-11-14"
+BOTS_CHECKED = "2026-11-16"
 SRC_OPENAI = "https://developers.openai.com/api/docs/bots"
 SRC_ANTHROPIC = ("https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-"
                  "site-owners-block-the-crawler")
@@ -51,6 +51,8 @@ SRC_GOOGLE = "https://developers.google.com/crawling/docs/crawlers-fetchers/goog
 SRC_APPLE = "https://support.apple.com/en-us/119829"
 SRC_PERPLEXITY = "https://docs.perplexity.ai/guides/bots"
 SRC_CCBOT = "https://commoncrawl.org/ccbot"
+SRC_META = "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/"
+SRC_AMAZON = "https://developer.amazon.com/amazonbot"
 
 BOT_TABLE = [
     {"token": "GPTBot", "role": "training", "ai": True, "provider": "OpenAI", "note": None, "source": SRC_OPENAI},
@@ -77,6 +79,9 @@ BOT_TABLE = [
     {"token": "Perplexity-User", "role": "user", "ai": True, "provider": "Perplexity", "note": "user_requested",
      "source": SRC_PERPLEXITY},
     {"token": "CCBot", "role": "training", "ai": True, "provider": "Common Crawl", "note": None, "source": SRC_CCBOT},
+    {"token": "Meta-ExternalAgent", "role": "training", "ai": True, "provider": "Meta", "note": None,
+     "source": SRC_META},
+    {"token": "Amazonbot", "role": "training", "ai": True, "provider": "Amazon", "note": None, "source": SRC_AMAZON},
 ]
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1063,7 +1068,7 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
                    for g in groups],
         "ignored_lines": ignored, "warnings": src["warnings"],
         "bots": [{"token": b["token"], "role": b["role"], "ai": b["ai"], "provider": b["provider"],
-                  "group": group_of[b["token"]], "note": b["note"]} for b in bots],
+                  "group": group_of[b["token"]], "note": b["note"], "source": b.get("source")} for b in bots],
         "urls": urls, "urls_source": "given" if given else "auto",
         "cells": [public_cell(c) for c in cells],
         "summary": {"cells": len(cells), "allowed": allowed, "denied": len(cells) - allowed, "violations": len(violations)},
@@ -1153,7 +1158,7 @@ def run_diff(args, t, out_lines: list[str], err_lines: list[str]) -> int:
         "old": file_info(old), "new": file_info(new), "groups": [], "ignored_lines": [],
         "warnings": old["warnings"] + new["warnings"],
         "bots": [{"token": b["token"], "role": b["role"], "ai": b["ai"], "provider": b["provider"], "group": None,
-                  "note": b["note"]} for b in bots],
+                  "note": b["note"], "source": b.get("source")} for b in bots],
         "urls": urls, "urls_source": "given" if given else "auto", "cells": [],
         "summary": {"cells": len(c_new), "allowed": sum(1 for c in c_new if c["allowed"]),
                     "denied": sum(1 for c in c_new if not c["allowed"]), "violations": 0},
