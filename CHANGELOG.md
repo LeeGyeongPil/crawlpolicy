@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.6] - 2026-11-16
+
+### Changed
+
+- The built-in crawler table now has 17 bots: `Meta-ExternalAgent` (Meta) and `Amazonbot` (Amazon) are added with the
+  provider's documentation URL as source (checked 2026-11-16). Both are in the `training` role, as each provider's page
+  says the crawler is used to train AI models.
+- The default matrix grows from 75 to 85 cells (17 bots x 5 URLs) and the verdict-line limit for `--url` runs with the
+  built-in table is 68 cells (17 x 4).
+- A robots.txt that did not block the new bots now reports new intent violations under `training=deny`, so a CI job
+  that passed before can exit with code 1. To keep the old behaviour pin the bots:
+  `--bots GPTBot,OAI-SearchBot,ChatGPT-User,OAI-AdsBot,ClaudeBot,Claude-SearchBot,Claude-User,Google-Extended,Google-CloudVertexBot,Googlebot,Applebot,Applebot-Extended,PerplexityBot,Perplexity-User,CCBot`
+  (the old 15 bots, 75 cells). Do not pin with a role name such as `training`: it now expands to the two new bots too.
+
 ## [0.1.5] - 2026-11-15
 
 ### Fixed

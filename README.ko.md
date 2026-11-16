@@ -62,7 +62,7 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py check samples/robots.txt \
 판정 표는 위에 있습니다. 그 아래로 위반과 수정안이 나옵니다(위반이 있어서 종료 코드는 1 입니다). 아래는 영어 출력의 일부입니다.
 
 ```
-Intent violations (11):
+Intent violations (17):
   ! OAI-SearchBot /admin/ => allow @L0  (wanted deny by 'all:/admin/=deny')
   ! ClaudeBot / => allow @L0  (wanted deny by 'training=deny')
   ...
@@ -100,7 +100,7 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py diff samples/robots.old.txt sa
 ```
 
 ![두 robots.txt 사이에서 바뀐 칸만](docs/images/diff.ko.png)
-*75칸 중 7칸이 바뀌었습니다: `Google-Extended` 는 열렸고(`(접근 허용으로 바뀜)`) `CCBot` 은 막혔습니다(`(접근 차단으로 바뀜)`).*
+*85칸 중 7칸이 바뀌었습니다: `Google-Extended` 는 열렸고(`(접근 허용으로 바뀜)`) `CCBot` 은 막혔습니다(`(접근 차단으로 바뀜)`).*
 
 ## 의도 문법
 
@@ -108,7 +108,7 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py diff samples/robots.old.txt sa
 
 | `<who>` | 뜻 |
 |---|---|
-| `training` | 학습 데이터를 모으는 크롤러(`GPTBot`, `ClaudeBot`, `CCBot`) |
+| `training` | 학습 데이터를 모으는 크롤러(`GPTBot`, `ClaudeBot`, `CCBot`, `Meta-ExternalAgent`, `Amazonbot`) |
 | `search` | 검색 크롤러(`OAI-SearchBot`, `Claude-SearchBot`, `Googlebot`, `Applebot`, `PerplexityBot`) |
 | `user` | 사용자 요청으로 가져오는 봇(`ChatGPT-User`, `Claude-User`, `Perplexity-User`) |
 | `control` | 수집된 내용의 사용 방식만 정하는 제어 토큰(`Google-Extended`, `Applebot-Extended`) |
@@ -128,12 +128,14 @@ python3 skills/crawlpolicy/scripts/crawlpolicy.py diff samples/robots.old.txt sa
 | Applebot, Applebot-Extended | Apple | search, control | [Apple 지원](https://support.apple.com/en-us/119829) |
 | PerplexityBot, Perplexity-User | Perplexity | search, user | [bots](https://docs.perplexity.ai/guides/bots) |
 | CCBot | Common Crawl | training | [CCBot](https://commoncrawl.org/ccbot) |
+| Meta-ExternalAgent | Meta | training | [web crawlers](https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/) |
+| Amazonbot | Amazon | training | [Amazonbot](https://developer.amazon.com/amazonbot) |
 
-2026-11-14 확인. Bingbot 은 해당 페이지를 확인하지 못해 표에서 뺐습니다. `--bots` 로 아무 토큰이나 넘기거나, `--bots-file FILE`(`{"token": ..., "role": ...}` 의 JSON 목록)로 표 전체를 바꿀 수 있습니다.
+2026-11-16 확인. Bingbot 은 해당 페이지를 확인하지 못해 표에서 뺐습니다. `--bots` 로 아무 토큰이나 넘기거나, `--bots-file FILE`(`{"token": ..., "role": ...}` 의 JSON 목록)로 표 전체를 바꿀 수 있습니다.
 
 ## 출력
 
-- 터미널: 판정 표, 위반, 패치, `re-verified: ...`(한국어 출력은 `재검증: ...`), 제공자 메모. 작은 실행(봇 하나, 12칸 이하, 또는 `--url`/`--urls` 로 URL 을 준 60칸 이하)은 판정 표 대신 칸마다 이긴 규칙 문장 또는 `(해당 규칙 없음)` 이 붙은 `<bot> <url> => allow|deny @L<n>  (<rule>)` 한 줄을 냅니다. 75칸짜리 데모처럼 큰 실행은 표를 그대로 씁니다.
+- 터미널: 판정 표, 위반, 패치, `re-verified: ...`(한국어 출력은 `재검증: ...`), 제공자 메모. 작은 실행(봇 하나, 12칸 이하, 또는 `--url`/`--urls` 로 URL 을 준 68칸 이하)은 판정 표 대신 칸마다 이긴 규칙 문장 또는 `(해당 규칙 없음)` 이 붙은 `<bot> <url> => allow|deny @L<n>  (<rule>)` 한 줄을 냅니다. 85칸짜리 데모처럼 큰 실행은 표를 그대로 씁니다.
 - 작업 폴더의 `crawlpolicy-report.json`: `source.sha256`, `verdict`·`rule_line` 이 있는 칸, 위반, `fix.verified`, `fix.violations_after`, `fix.regressions`. 키는 두 언어에서 같고, 실행할 때마다 덮어씁니다. 수정 안 한 `robots.fixed.txt` 에 `check`·`diff` 를 다시 돌리면 원래 report 는 그대로 두고 결과를 안내 문구와 함께 `crawlpolicy-report.fixed.json` 에 씁니다. fix 실행이 이미 재검증 결과를 출력하므로 이 두 번째 실행은 필요 없습니다.
 - `--out /dev/null`: 보고서를 남기지 않습니다. 판정과 패치는 그대로 출력하고 `files:` 줄이 보고서를 남기지 않았다고 알립니다. 작업 폴더에 쓸 수 없으면(읽기 전용·권한 없음) 아무것도 쓰지 않고 모든 판정·패치·`re-verified:` 줄을 출력하며 stderr 에 경고 한 줄을 냅니다. 종료 코드는 판정을 따릅니다. 직접 준 `--out` 에 쓸 수 없으면 입력 오류(종료 2)입니다.
 - 모든 실행은 `files:` 줄(한국어 출력은 `파일:`)로 끝납니다. 입력 파일은 하나도 바꾸지 않았고 이번에 쓴 출력 파일(보고서, 수정안이 있으면 `robots.fixed.txt` 도)이 적힙니다. 앞선 실행이 남긴 보고서나 `robots.fixed.txt` 를 바꿨다면 그 사실도 밝힙니다(`... already existed and was replaced`). 편집이 아니라 출력이니 그대로 두세요. `--out`·`--fixed-out` 이 입력 파일(robots.txt, `--urls`, `--bots-file`)이나 서로를 가리키면 옵션 이름을 적어 거부합니다(종료 2). 예: `error: --fixed-out urls.txt would overwrite the --urls file — choose another path`(한국어 출력은 `오류: ...`). 직접 준 `--out` 은 crawlpolicy 보고서가 아닌 기존 파일을 바꾸지 않습니다. 직접 고른 `--fixed-out` 경로에 파일이 이미 있으면 교체하고 `files:` 줄이 알려 줍니다. 잘못된 URL 은 한 줄 오류와 종료 2 입니다.
@@ -161,11 +163,11 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | 필요 없을 때 안 불림 | 11/11 |
 | 스킬로 푼 작업 | 7/7 |
 | 스킬 없이 푼 작업(기준선) | 0/7 |
-| 평균 점수 차이(Δ) | +0.59 |
+| 평균 점수 차이(Δ) | +0.61 |
 | 가짜 스크립트를 잡아낸 비율 | 7/7 |
 | Codex CLI | 작업 7/7 통과 · 확인됨 |
 
-Claude Code 2.1.322 · sonnet · 케이스마다 3회 · 2026-11-15 측정 · codex-cli 0.154.0
+Claude Code 2.1.322 · sonnet · 케이스마다 3회 · 2026-11-16 측정 · codex-cli 0.154.0
 <!-- skill-eval:end -->
 
 ## 동작 원리
@@ -199,7 +201,7 @@ flowchart LR
 uv sync && uv run pytest -q
 ```
 
-테스트 241개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
+테스트 242개가 통과합니다(`uv run pytest -q`, 파이썬 3.10·3.12·3.14 CI 매트릭스). `evals/` 폴더에는 발동 케이스 12개(한국어 3개), 비발동 케이스 11개, 픽스처가 있는 작업 케이스 7개가 있고 `claude plugin eval` 이 사용합니다.
 
 ## 라이선스
 
