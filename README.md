@@ -47,7 +47,7 @@ Sources: [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309), [google/robotstxt](
 /plugin install crawlpolicy@crawlpolicy-skill
 ```
 
-**Other agents (Agent Skills standard)** — copy `skills/crawlpolicy` into the agent's skills folder, for Claude Code without the plugin: `.claude/skills/`, for Codex CLI: `.agents/skills/`.
+**Other agents (Agent Skills standard)** — copy `skills/crawlpolicy` into the agent's skills folder, for Claude Code without the plugin: `.claude/skills/`.
 
 Needs Python 3.10+ (`python3 --version`); nothing else. On a minimal Linux image: `apt-get install -y python3`.
 
@@ -166,9 +166,9 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | Tasks solved without it (baseline) | 0/7 |
 | Mean score gain (Δ) | +0.61 |
 | Tasks that catch a broken script | 7/7 |
-| Codex CLI | 7/7 tasks · verified |
+| Codex CLI | not verified |
 
-Measured 2026-11-16 with Claude Code 2.1.322 · sonnet · 3 runs per case · codex-cli 0.154.0
+Measured 2026-11-27 with Claude Code 2.1.332 · sonnet · 3 runs per case · codex-cli 0.154.0
 <!-- skill-eval:end -->
 
 ## How it works

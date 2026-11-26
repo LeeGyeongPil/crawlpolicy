@@ -47,7 +47,7 @@ robots.txt 를 건물 출입 규칙표라고 생각해 보세요. 표를 눈으�
 /plugin install crawlpolicy@crawlpolicy-skill
 ```
 
-**다른 에이전트(Agent Skills 표준)** — `skills/crawlpolicy` 를 에이전트의 스킬 폴더로 복사합니다. 플러그인 없이 Claude Code 를 쓰면 `.claude/skills/`, Codex CLI 는 `.agents/skills/`.
+**다른 에이전트(Agent Skills 표준)** — `skills/crawlpolicy` 를 에이전트의 스킬 폴더로 복사합니다. 플러그인 없이 Claude Code 를 쓰면 `.claude/skills/`.
 
 파이썬 3.10 이상(`python3 --version`)만 있으면 됩니다. 최소 리눅스 이미지에서는 `apt-get install -y python3`.
 
@@ -165,9 +165,9 @@ CRAWLPOLICY_LANG=ko python3 skills/crawlpolicy/scripts/crawlpolicy.py diff sampl
 | 스킬 없이 푼 작업(기준선) | 0/7 |
 | 평균 점수 차이(Δ) | +0.61 |
 | 가짜 스크립트를 잡아낸 비율 | 7/7 |
-| Codex CLI | 작업 7/7 통과 · 확인됨 |
+| Codex CLI | 미검증 |
 
-Claude Code 2.1.322 · sonnet · 케이스마다 3회 · 2026-11-16 측정 · codex-cli 0.154.0
+Claude Code 2.1.332 · sonnet · 케이스마다 3회 · 2026-11-27 측정 · codex-cli 0.154.0
 <!-- skill-eval:end -->
 
 ## 동작 원리
