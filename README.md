@@ -202,7 +202,7 @@ Good fits: checking a robots.txt before deploy when you want AI training crawler
 uv sync && uv run pytest -q
 ```
 
-242 tests pass (`uv run pytest -q`, Python 3.10, 3.12 and 3.14 in the CI matrix). The `evals/` folder holds 12 trigger cases (3 in Korean), 11 no-trigger cases and 7 task cases with fixtures, used by `claude plugin eval`.
+247 tests pass (`uv run pytest -q`, Python 3.10, 3.12 and 3.14 in the CI matrix). The `evals/` folder holds 12 trigger cases (3 in Korean), 11 no-trigger cases and 7 task cases with fixtures, used by `claude plugin eval`.
 
 ## License
 

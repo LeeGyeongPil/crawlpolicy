@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.7] - 2026-11-27
+
+### Fixed
+
+- English output: the "lines are not used for verdicts" note now says "1 line is not used" for a single line instead
+  of "1 lines are".
+- With `--out /dev/null` there is no report to point at, so the note now lists the ignored lines themselves
+  (for example `L3 Crawl-delay: 5 (nonstandard)`) instead of mentioning `ignored_lines`. Korean output is unchanged.
+
 ## [0.1.6] - 2026-11-16
 
 ### Changed
