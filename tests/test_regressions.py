@@ -309,3 +309,45 @@ def test_files_line_messages_exist_in_both_languages():
         assert "{files}" in cp.MESSAGES[lang]["outputs_replaced"] and "{replaced}" in cp.MESSAGES[lang]["outputs_replaced"]
         for field in ("{opt}", "{path}", "{what}"):
             assert field in cp.MESSAGES[lang]["err_out_clash"], (lang, field)
+
+
+def _ignored_case(tmp_path, extra: str):
+    """A robots.txt with nonstandard lines (ignored for verdicts); returns its path."""
+    p = tmp_path / "robots.txt"
+    p.write_text("User-agent: *\nDisallow: /x\n" + extra, encoding="utf-8")
+    return str(p)
+
+
+def test_ignored_note_singular_with_report(cli, tmp_path):
+    res = cli("--lang", "en", "check", _ignored_case(tmp_path, "Crawl-delay: 5\n"), "--bots", "GPTBot",
+              "--out", str(tmp_path / "r.json"))
+    assert "1 line is not used for verdicts (see ignored_lines in the report)" in res.out
+    assert "1 lines" not in res.out
+
+
+def test_ignored_note_plural_with_report(cli, tmp_path):
+    res = cli("--lang", "en", "check", _ignored_case(tmp_path, "Crawl-delay: 5\nHost: a\n"), "--bots", "GPTBot",
+              "--out", str(tmp_path / "r.json"))
+    assert "2 lines are not used for verdicts (see ignored_lines in the report)" in res.out
+
+
+def test_ignored_note_devnull_lists_lines_singular(cli, tmp_path):
+    res = cli("--lang", "en", "check", _ignored_case(tmp_path, "Crawl-delay: 5\n"), "--bots", "GPTBot",
+              "--out", "/dev/null")
+    assert "1 line is not used for verdicts:" in res.out
+    assert "L3 Crawl-delay: 5 (nonstandard)" in res.out
+    assert "ignored_lines" not in res.out
+
+
+def test_ignored_note_devnull_lists_lines_plural(cli, tmp_path):
+    res = cli("--lang", "en", "check", _ignored_case(tmp_path, "Crawl-delay: 5\nHost: a\n"), "--bots", "GPTBot",
+              "--out", "/dev/null")
+    assert "2 lines are not used for verdicts:" in res.out
+    assert "L3 Crawl-delay: 5 (nonstandard)" in res.out and "L4 Host: a (nonstandard)" in res.out
+    assert "ignored_lines" not in res.out
+
+
+def test_ignored_note_korean_unchanged(cli, tmp_path):
+    res = cli("--lang", "ko", "check", _ignored_case(tmp_path, "Crawl-delay: 5\n"), "--bots", "GPTBot",
+              "--out", "/dev/null")
+    assert "1개 줄은 판정에 쓰지 않았습니다 (보고서의 ignored_lines 참고)" in res.out

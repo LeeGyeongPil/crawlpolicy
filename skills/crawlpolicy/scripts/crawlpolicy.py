@@ -22,7 +22,7 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 MAX_BYTES = 500 * 1024  # RFC 9309 section 2.5: a crawler parses at least the first 500 KiB
 MAX_AUTO_URLS = 40
 MAX_PATCH_LINES = 40  # longer patches are cut on screen; the whole fixed copy is in the fixed file
@@ -150,6 +150,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "note_control_token": "control token: does not crawl itself, it only controls how crawled content may be used",
         "note_apple_fallback": "without an Applebot group Apple falls back to the Googlebot rules (not applied here)",
         "ignored_note": "{n} lines are not used for verdicts (see ignored_lines in the report)",
+        "ignored_note_one": "{n} line is not used for verdicts (see ignored_lines in the report)",
+        "ignored_note_listed": "{n} lines are not used for verdicts:",
+        "ignored_note_listed_one": "{n} line is not used for verdicts:",
+        "ignored_item": "  L{line} {text} ({reason})",
         "warn_truncated": "warning: {path} is larger than 500 KiB — only the first 500 KiB were read",
         "diff_head": "diff {old} -> {new}",
         "diff_none": "No verdict changed ({cells} {cell_word} compared).",
@@ -250,6 +254,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "note_control_token": "제어 토큰: 직접 크롤링하지 않고 수집된 내용의 사용 방식만 정함",
         "note_apple_fallback": "Applebot 그룹이 없으면 Apple 은 Googlebot 규칙을 따름 (여기서는 적용하지 않음)",
         "ignored_note": "{n}개 줄은 판정에 쓰지 않았습니다 (보고서의 ignored_lines 참고)",
+        "ignored_note_one": "{n}개 줄은 판정에 쓰지 않았습니다 (보고서의 ignored_lines 참고)",
+        "ignored_note_listed": "{n}개 줄은 판정에 쓰지 않았습니다 (보고서의 ignored_lines 참고)",
+        "ignored_note_listed_one": "{n}개 줄은 판정에 쓰지 않았습니다 (보고서의 ignored_lines 참고)",
+        "ignored_item": "  {line}번째 줄 {text} ({reason})",
         "warn_truncated": "경고: {path} 가 500 KiB 보다 커서 앞 500 KiB 만 읽었습니다",
         "diff_head": "비교 {old} -> {new}",
         "diff_none": "바뀐 판정이 없습니다 ({cells}칸 비교).",
@@ -1094,7 +1102,12 @@ def run_check(args, t, out_lines: list[str], err_lines: list[str]) -> int:
     out_lines.append(t("legend"))
     out_lines.append(t("summary", cells=len(cells), cell_word=cell_word(len(cells)), allowed=allowed, denied=len(cells) - allowed, violations=len(violations)))
     if ignored:
-        out_lines.append(t("ignored_note", n=len(ignored)))
+        n_ign = len(ignored)
+        if no_report and t("ignored_note_listed_one").startswith("{n} line"):  # no report to point at: show the lines themselves
+            out_lines.append(t("ignored_note_listed_one" if n_ign == 1 else "ignored_note_listed", n=n_ign))
+            out_lines.extend(t("ignored_item", line=i["line"], text=i["text"], reason=i["reason"]) for i in ignored)
+        else:
+            out_lines.append(t("ignored_note_one" if n_ign == 1 else "ignored_note", n=n_ign))
     if not clauses:
         out_lines.append(t("no_intent"))
     elif not violations:
